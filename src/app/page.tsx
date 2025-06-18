@@ -10,6 +10,7 @@ export default function Home() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useState<string>('');
   const [vacationPay, setVacationPay] = useState<number>(12);
+  const [hoursPerDay, setHoursPerDay] = useState<number>(7.5);
 
   // Track selected days: key is "year-month-day", value is the status
   const [dayStates, setDayStates] = useState<Map<string, DayStatus>>(new Map());
@@ -193,6 +194,28 @@ export default function Home() {
 
           <div className="text-xl leading-relaxed text-justify">
             <p style={{ color: 'var(--text-primary)' }}>
+              Jeg jobber{' '}
+              <input
+                type="number"
+                value={hoursPerDay || ''}
+                onChange={(e) => setHoursPerDay(Number(e.target.value))}
+                className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
+                style={{
+                  borderBottomColor: 'var(--input-border)',
+                  color: 'var(--text-primary)',
+                  fontSize: 'inherit',
+                  fontFamily: 'inherit',
+                  width: '50px'
+                }}
+                placeholder="7.5"
+                step="0.1"
+              />
+              {' '}timer per dag (for en {hoursPerDay * 5} timer arbeidsuke).
+            </p>
+          </div>
+
+          <div className="text-xl leading-relaxed text-justify">
+            <p style={{ color: 'var(--text-primary)' }}>
               Jeg vil beregne min totale lønn og timespris for{' '}
               <input
                 type="number"
@@ -260,7 +283,7 @@ export default function Home() {
             className="text-sm italic"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Lønnskalkulatoren * laga med kjærleik og claude code
+            Lønnskalkulatoren &nbsp;&nbsp;·&nbsp;&nbsp; laga med kjærleik og claude code
           </p>
         </footer>
       </div>
