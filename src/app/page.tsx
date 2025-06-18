@@ -368,8 +368,8 @@ export default function Home() {
             onClick={() => {
               // Reset global form fields
               setYearlyIncomeDisplay('');
-              setVacationPay(12);
-              setHoursPerDay(7.5);
+              setVacationPay(undefined);
+              setHoursPerDay(undefined);
               
               // Clear current year's day states
               setDayStatesObj({});
