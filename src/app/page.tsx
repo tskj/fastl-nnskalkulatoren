@@ -10,10 +10,10 @@ export default function Home() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useState<string>('');
   const [vacationPay, setVacationPay] = useState<number>(12);
-  
+
   // Track selected days: key is "year-month-day", value is the status
   const [dayStates, setDayStates] = useState<Map<string, DayStatus>>(new Map());
-  
+
   // Current selection mode for drag operations
   const [selectionMode, setSelectionMode] = useState<DayStatus>('ferie');
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -120,7 +120,7 @@ export default function Home() {
   const formatNumber = (value: string): string => {
     // Remove all non-digits
     const numericValue = value.replace(/\D/g, '');
-    
+
     // Add spaces as thousands separators
     return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   };
@@ -132,7 +132,7 @@ export default function Home() {
   };
 
   return (
-    <div 
+    <div
       className="min-h-screen px-8 py-16"
       style={{ background: 'var(--background)' }}
       onMouseUp={endDrag}
@@ -140,7 +140,7 @@ export default function Home() {
     >
       <div className="max-w-4xl mx-auto">
         <header className="mb-16 text-center">
-          <h1 
+          <h1
             className="text-5xl font-medium mb-6"
             style={{ color: 'var(--text-primary)' }}
           >
@@ -240,9 +240,9 @@ export default function Home() {
         <div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {months.map((month, index) => (
-              <Month 
-                key={index} 
-                month={month} 
+              <Month
+                key={index}
+                month={month}
                 getDayStatus={getDayStatus}
                 updateDayStatus={updateDayStatus}
                 startDrag={startDrag}
@@ -256,11 +256,11 @@ export default function Home() {
         </div>
 
         <footer className="mt-24 text-center">
-          <p 
+          <p
             className="text-sm italic"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Lønnskalkulator — laga med kjærleik og Claude Code
+            Lønnskalkulatoren * laga med kjærleik og claude code
           </p>
         </footer>
       </div>

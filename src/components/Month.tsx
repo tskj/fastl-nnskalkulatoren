@@ -185,7 +185,9 @@ export default function Month({ month, getDayStatus, updateDayStatus, startDrag,
                 ${statusStyle.className}
                 ${isWeekend
                   ? 'opacity-50'
-                  : 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30'
+                  : dayStatus 
+                    ? 'cursor-pointer'
+                    : 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30'
                 }
               `}
               style={statusStyle.style}
