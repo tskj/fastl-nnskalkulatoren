@@ -11,13 +11,14 @@ interface MonthProps {
   month: CalendarMonth;
   getDayStatus: (year: number, month: string, day: number) => DayStatus;
   updateDayStatus: (year: number, month: string, day: number, status: DayStatus) => void;
-  startDrag: () => void;
+  startDrag: (action: 'add' | 'remove') => void;
   endDrag: () => void;
   handleDragOver: (year: number, month: string, day: number) => void;
   selectionMode: DayStatus;
+  dragAction: 'add' | 'remove';
 }
 
-export default function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handleDragOver, selectionMode }: MonthProps) {
+export default function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handleDragOver, selectionMode, dragAction }: MonthProps) {
   // Get month name and year
   const monthNames = [
     'januar', 'februar', 'mars', 'april', 'mai', 'juni',
@@ -28,8 +29,21 @@ export default function Month({ month, getDayStatus, updateDayStatus, startDrag,
 
   // Handle mouse down on day (start drag and select current day)
   const handleMouseDown = (day: CalendarDate) => {
-    startDrag();
-    updateDayStatus(day.year, day.month, day.day, selectionMode);
+    const currentStatus = getDayStatus(day.year, day.month, day.day);
+    
+    // Determine action based on current state
+    let action: 'add' | 'remove';
+    if (currentStatus === selectionMode) {
+      // If clicking on a day with the same status as selection mode, start removing
+      updateDayStatus(day.year, day.month, day.day, null);
+      action = 'remove';
+    } else {
+      // Otherwise, start adding
+      updateDayStatus(day.year, day.month, day.day, selectionMode);
+      action = 'add';
+    }
+    
+    startDrag(action);
   };
 
   // Handle mouse enter on day (select if dragging)

@@ -17,6 +17,7 @@ export default function Home() {
   // Current selection mode for drag operations
   const [selectionMode, setSelectionMode] = useState<DayStatus>('ferie');
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragAction, setDragAction] = useState<'add' | 'remove'>('add');
 
   // Helper to create day key
   const getDayKey = (year: number, month: string, day: number): string => {
@@ -44,8 +45,9 @@ export default function Home() {
   };
 
   // Start drag operation
-  const startDrag = () => {
+  const startDrag = (action: 'add' | 'remove') => {
     setIsDragging(true);
+    setDragAction(action);
   };
 
   // End drag operation
@@ -53,10 +55,14 @@ export default function Home() {
     setIsDragging(false);
   };
 
-  // Handle drag over day (select day during drag)
+  // Handle drag over day (select/deselect day during drag)
   const handleDragOver = (year: number, month: string, day: number) => {
     if (isDragging) {
-      updateDayStatus(year, month, day, selectionMode);
+      if (dragAction === 'add') {
+        updateDayStatus(year, month, day, selectionMode);
+      } else {
+        updateDayStatus(year, month, day, null);
+      }
     }
   };
 
@@ -66,7 +72,7 @@ export default function Home() {
       case 'ferie':
         return 'ferie';
       case 'permisjon_med_lonn':
-        return 'permisjon med lønn';
+        return 'lønna permisjon';
       case 'permisjon_uten_lonn':
         return 'fri uten lønn';
       default:
@@ -240,6 +246,7 @@ export default function Home() {
                 getDayStatus={getDayStatus}
                 updateDayStatus={updateDayStatus}
                 startDrag={startDrag}
+                dragAction={dragAction}
                 endDrag={endDrag}
                 handleDragOver={handleDragOver}
                 selectionMode={selectionMode}
@@ -253,7 +260,7 @@ export default function Home() {
             className="text-sm italic"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Lønnskalkulator — bygget med Next.js
+            Lønnskalkulator — laga med kjærleik og Claude Code
           </p>
         </footer>
       </div>
