@@ -361,20 +361,23 @@ export default function Home() {
           </div>
         </div>
 
-        <footer className="mt-24 text-center">
+        <div className="text-center mt-8">
+          <span
+            onClick={clearAllLocalStorage}
+            className="text-sm text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Nullstill alle data
+          </span>
+        </div>
+
+        <footer className="mt-12 text-center">
           <p
             className="text-sm italic mb-4"
             style={{ color: 'var(--text-secondary)' }}
           >
             Lønnskalkulatoren &nbsp;&nbsp;·&nbsp;&nbsp; laga med kjærleik og claude code
           </p>
-          <button
-            onClick={clearAllLocalStorage}
-            className="text-xs underline opacity-50 hover:opacity-75 transition-opacity cursor-pointer"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            nullstill alle data
-          </button>
         </footer>
       </div>
     </div>
