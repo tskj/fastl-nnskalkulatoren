@@ -363,7 +363,15 @@ export default function Home() {
 
         <div className="text-center mt-8">
           <span
-            onClick={clearAllLocalStorage}
+            onClick={() => {
+              // Reset global form fields
+              setYearlyIncomeDisplay('');
+              setVacationPay(12);
+              setHoursPerDay(7.5);
+              
+              // Clear current year's day states
+              setDayStatesObj({});
+            }}
             className="text-sm text-red-600 dark:text-red-400 hover:underline cursor-pointer"
             style={{ color: 'var(--text-primary)' }}
           >
