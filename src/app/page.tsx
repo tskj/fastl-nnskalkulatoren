@@ -39,29 +39,6 @@ export default function Home() {
         <div className="max-w-2xl mx-auto space-y-12">
           <div className="text-xl leading-relaxed text-justify">
             <p style={{ color: 'var(--text-primary)' }}>
-              Dette gjelder for år{' '}
-              <input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(Number(e.target.value))}
-                className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
-                style={{
-                  borderBottomColor: 'var(--input-border)',
-                  color: 'var(--text-primary)',
-                  fontSize: 'inherit',
-                  fontFamily: 'inherit',
-                  width: '60px'
-                }}
-                placeholder="2025"
-                min="2020"
-                max="2030"
-              />
-              .
-            </p>
-          </div>
-
-          <div className="text-xl leading-relaxed text-justify">
-            <p style={{ color: 'var(--text-primary)' }}>
               Min nominelle årslønn er{' '}
               <input
                 type="text"
@@ -99,6 +76,29 @@ export default function Home() {
                 placeholder="12"
               />
               {' '}% feriepenger.
+            </p>
+          </div>
+
+          <div className="text-xl leading-relaxed text-justify">
+            <p style={{ color: 'var(--text-primary)' }}>
+              Jeg vil beregne min totale lønn og timespris for{' '}
+              <input
+                type="number"
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value))}
+                className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
+                style={{
+                  borderBottomColor: 'var(--input-border)',
+                  color: 'var(--text-primary)',
+                  fontSize: 'inherit',
+                  fontFamily: 'inherit',
+                  width: '60px'
+                }}
+                placeholder="2025"
+                min="2020"
+                max="2030"
+              />
+              .
             </p>
           </div>
         </div>
