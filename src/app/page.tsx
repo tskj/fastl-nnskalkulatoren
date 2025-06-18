@@ -268,9 +268,9 @@ export default function Home() {
               placeholder="7.5"
               step="0.1"
               />
-              {' '}timer per dag 
+              {' '}timer per dag{' '}
               {hoursPerDay && (
-                <span className="opacity-50 animate-fadeIn">(for en {hoursPerDay * 5} timer arbeidsuke)</span>
+                <span className="opacity-50 animate-fadeIn"> (for en {hoursPerDay * 5} timer arbeidsuke)</span>
               )}
             </p>
           </div>
