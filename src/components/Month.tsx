@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   CalendarMonth,
   CalendarDate,
@@ -18,7 +19,7 @@ interface MonthProps {
   dragAction: 'add' | 'remove';
 }
 
-export default function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handleDragOver, selectionMode, dragAction }: MonthProps) {
+function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handleDragOver, selectionMode, dragAction }: MonthProps) {
   // Get month name and year
   const monthNames = [
     'januar', 'februar', 'mars', 'april', 'mai', 'juni',
@@ -203,3 +204,5 @@ export default function Month({ month, getDayStatus, updateDayStatus, startDrag,
     </div>
   );
 }
+
+export default memo(Month);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useDeferredValue, useMemo, useEffect, useRef } from 'react';
 import { CalendarMonth, monthName } from 'typescript-calendar-date';
 import Month from '@/components/Month';
 
@@ -8,9 +8,16 @@ export type DayStatus = 'ferie' | 'permisjon_med_lonn' | 'permisjon_uten_lonn' |
 
 export default function Home() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [isYearDropdownOpen, setIsYearDropdownOpen] = useState<boolean>(false);
   const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useState<string>('');
   const [vacationPay, setVacationPay] = useState<number>(12);
   const [hoursPerDay, setHoursPerDay] = useState<number>(7.5);
+
+  // Defer year changes to avoid blocking UI
+  const deferredYear = useDeferredValue(year);
+
+  // Ref for dropdown click-outside detection
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Track selected days: key is "year-month-day", value is the status
   const [dayStates, setDayStates] = useState<Map<string, DayStatus>>(new Map());
@@ -112,11 +119,34 @@ export default function Home() {
     }
   };
 
-  // Generate all 12 months for the selected year
-  const months: CalendarMonth[] = Array.from({ length: 12 }, (_, i) => ({
-    year,
-    month: monthName(i + 1)
-  }));
+  // Generate all 12 months for the selected year (memoized to avoid recalculation)
+  const months: CalendarMonth[] = useMemo(() => 
+    Array.from({ length: 12 }, (_, i) => ({
+      year: deferredYear,
+      month: monthName(i + 1)
+    })), [deferredYear]
+  );
+
+  // Generate year options (current year ± 3)
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 7 }, (_, i) => currentYear - 3 + i);
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsYearDropdownOpen(false);
+      }
+    };
+
+    if (isYearDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isYearDropdownOpen]);
+
 
   const formatNumber = (value: string): string => {
     // Remove all non-digits
@@ -217,22 +247,48 @@ export default function Home() {
           <div className="text-xl leading-relaxed text-justify">
             <p style={{ color: 'var(--text-primary)' }}>
               Jeg vil beregne min totale lønn og timespris for{' '}
-              <input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(Number(e.target.value))}
-                className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
-                style={{
-                  borderBottomColor: 'var(--input-border)',
-                  color: 'var(--text-primary)',
-                  fontSize: 'inherit',
-                  fontFamily: 'inherit',
-                  width: '60px'
-                }}
-                placeholder="2025"
-                min="2020"
-                max="2030"
-              />
+              <div className="inline-block relative mx-1" ref={dropdownRef}>
+                <button
+                  onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
+                  className="bg-transparent border-0 border-b border-solid focus:outline-none text-center cursor-pointer salary-input hover:opacity-70 transition-opacity"
+                  style={{
+                    borderBottomColor: 'var(--input-border)',
+                    color: 'var(--text-primary)',
+                    fontSize: 'inherit',
+                    fontFamily: 'inherit',
+                    width: '60px'
+                  }}
+                >
+                  {year}
+                </button>
+                {isYearDropdownOpen && (
+                  <div 
+                    className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10"
+                    style={{ minWidth: '80px' }}
+                  >
+                    {yearOptions.map(yearOption => (
+                      <button
+                        key={yearOption}
+                        data-year={yearOption}
+                        onClick={() => {
+                          setYear(yearOption);
+                          setIsYearDropdownOpen(false);
+                        }}
+                        className={`block w-full px-3 py-1 text-left hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors ${
+                          yearOption === year ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+                        }`}
+                        style={{ 
+                          color: 'var(--text-primary)',
+                          fontSize: 'inherit',
+                          fontFamily: 'inherit'
+                        }}
+                      >
+                        {yearOption}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               .
             </p>
           </div>
