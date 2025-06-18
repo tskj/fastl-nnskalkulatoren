@@ -268,7 +268,10 @@ export default function Home() {
               placeholder="7.5"
               step="0.1"
               />
-              {' '}timer per dag <span className="opacity-50">(for en {isHydrated ? (hoursPerDay ?? 0) * 5 : ''} timer arbeidsuke)</span>.
+              {' '}timer per dag 
+              {hoursPerDay && (
+                <span className="opacity-50 animate-fadeIn">(for en {hoursPerDay * 5} timer arbeidsuke)</span>
+              )}
             </p>
           </div>
 

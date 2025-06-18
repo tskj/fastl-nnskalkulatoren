@@ -11,6 +11,15 @@ module.exports = {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
       },
+      animation: {
+        fadeIn: 'fadeIn 200ms ease-out forwards',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(-3px)' },
+          '100%': { opacity: '0.5', transform: 'translateY(0)' },
+        },
+      },
     },
   },
   plugins: [],
