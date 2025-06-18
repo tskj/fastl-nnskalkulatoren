@@ -67,10 +67,10 @@ export default function Month({ month, getDayStatus, updateDayStatus, startDrag,
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 calendar-grid">
         {/* Empty cells for days before month starts */}
         {Array.from({ length: startPosition }, (_, i) => (
-          <div key={`empty-${i}`} className="aspect-square"></div>
+          <div key={`empty-${i}`} className="calendar-day"></div>
         ))}
 
         {/* Days of the month */}
@@ -79,35 +79,102 @@ export default function Month({ month, getDayStatus, updateDayStatus, startDrag,
           const isWeekend = dayWeekDay === 'sat' || dayWeekDay === 'sun';
           const dayStatus = getDayStatus(day.year, day.month, day.day);
 
-          // Get background color based on status
-          const getStatusColor = () => {
+          // Clean approach: use your library to verify grid adjacency
+          const weekDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+          const currentDayOfWeek = dayOfWeek(day);
+          const currentIndex = weekDays.indexOf(currentDayOfWeek);
+
+          // Simple approach: check if consecutive days are truly adjacent in the calendar grid
+          const leftDay = day.day > 1 ? { year: day.year, month: day.month, day: day.day - 1 } : null;
+          const rightDay = day.day < daysInMonth ? { year: day.year, month: day.month, day: day.day + 1 } : null;
+          
+          // For horizontal neighbors, they must be consecutive days AND not cross week boundaries
+          const isLeftNeighbor = leftDay && currentDayOfWeek !== 'mon';
+          const isRightNeighbor = rightDay && currentDayOfWeek !== 'sun';
+
+          // Check top neighbor (vertically adjacent, same day of week)
+          const topDay = day.day - 7 >= 1 ? { year: day.year, month: day.month, day: day.day - 7 } : null;
+          const topDayOfWeek = topDay ? dayOfWeek(topDay) : null;
+          const isTopNeighbor = topDayOfWeek === currentDayOfWeek;
+
+          // Check bottom neighbor (vertically adjacent, same day of week)
+          const bottomDay = day.day + 7 <= daysInMonth ? { year: day.year, month: day.month, day: day.day + 7 } : null;
+          const bottomDayOfWeek = bottomDay ? dayOfWeek(bottomDay) : null;
+          const isBottomNeighbor = bottomDayOfWeek === currentDayOfWeek;
+
+          const leftStatus = leftDay && isLeftNeighbor ? getDayStatus(leftDay.year, leftDay.month, leftDay.day) : null;
+          const rightStatus = rightDay && isRightNeighbor ? getDayStatus(rightDay.year, rightDay.month, rightDay.day) : null;
+          const topStatus = topDay && isTopNeighbor ? getDayStatus(topDay.year, topDay.month, topDay.day) : null;
+          const bottomStatus = bottomDay && isBottomNeighbor ? getDayStatus(bottomDay.year, bottomDay.month, bottomDay.day) : null;
+          
+          // Check connections
+          const connectLeft = leftStatus === dayStatus && dayStatus !== null;
+          const connectRight = rightStatus === dayStatus && dayStatus !== null;
+          const connectTop = topStatus === dayStatus && dayStatus !== null;
+          const connectBottom = bottomStatus === dayStatus && dayStatus !== null;
+
+          // Get styling based on status
+          const getStatusStyle = () => {
+            if (!dayStatus) {
+              return {
+                className: '',
+                style: { color: 'var(--text-primary)' }
+              };
+            }
+
+            let bgColor = '';
+            let textColor = '';
             switch (dayStatus) {
               case 'ferie':
-                return 'bg-blue-200 dark:bg-blue-800';
+                bgColor = 'bg-blue-200 dark:bg-blue-800';
+                textColor = 'text-blue-900 dark:text-blue-100';
+                break;
               case 'permisjon_med_lonn':
-                return 'bg-green-200 dark:bg-green-800';
+                bgColor = 'bg-green-200 dark:bg-green-800';
+                textColor = 'text-green-900 dark:text-green-100';
+                break;
               case 'permisjon_uten_lonn':
-                return 'bg-orange-200 dark:bg-orange-800';
-              default:
-                return '';
+                bgColor = 'bg-orange-200 dark:bg-orange-800';
+                textColor = 'text-orange-900 dark:text-orange-100';
+                break;
             }
+
+            // Build rounded corners based on connections - each corner independently
+            const corners = [];
+            if (!connectTop && !connectLeft) corners.push('rounded-tl-md');
+            if (!connectTop && !connectRight) corners.push('rounded-tr-md');
+            if (!connectBottom && !connectLeft) corners.push('rounded-bl-md');
+            if (!connectBottom && !connectRight) corners.push('rounded-br-md');
+            
+            // If no connections at all, use full rounding
+            const roundedClasses = corners.length === 4 ? 'rounded-md' : corners.join(' ');
+
+            // Add connection classes for overlapping
+            const connectionClasses = [];
+            if (connectRight) connectionClasses.push('connect-right');
+            if (connectBottom) connectionClasses.push('connect-bottom');
+
+            return {
+              className: `${bgColor} ${textColor} ${roundedClasses} relative ${connectionClasses.join(' ')}`,
+              style: {}
+            };
           };
+
+          const statusStyle = getStatusStyle();
 
           return (
             <div
               key={`${day.year}-${day.month}-${day.day}`}
               className={`
-                aspect-square flex items-center justify-center text-sm rounded-md
-                transition-colors duration-200
-                ${getStatusColor()}
+                calendar-day flex items-center justify-center text-sm
+                transition-all duration-200
+                ${statusStyle.className}
                 ${isWeekend
                   ? 'opacity-50'
                   : 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30'
                 }
               `}
-              style={{
-                color: 'var(--text-primary)'
-              }}
+              style={statusStyle.style}
               onMouseDown={() => !isWeekend && handleMouseDown(day)}
               onMouseEnter={() => !isWeekend && handleMouseEnter(day)}
               onMouseUp={endDrag}

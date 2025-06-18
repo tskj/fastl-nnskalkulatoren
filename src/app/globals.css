@@ -62,3 +62,24 @@ input, button {
   -moz-user-select: auto;
   -ms-user-select: auto;
 }
+
+/* Ensure calendar days are truly square */
+.calendar-day {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+}
+
+/* Connected calendar styling */
+.calendar-grid {
+  gap: 0;
+}
+
+.calendar-day.connect-right {
+  margin-right: -1px;
+  z-index: 1;
+}
+
+.calendar-day.connect-bottom {
+  margin-bottom: -1px;
+  z-index: 1;
+}
