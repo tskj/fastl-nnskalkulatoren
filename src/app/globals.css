@@ -1,50 +1,46 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f9fafb;
-  --foreground: #111827;
-  --bg-gradient: linear-gradient(to bottom right, #dbeafe, #e0e7ff, #f3e8ff);
-  --card-bg: rgba(255, 255, 255, 0.8);
-  --card-border: rgba(255, 255, 255, 0.2);
-  --input-bg: #f9fafb;
-  --input-border: #e5e7eb;
-  --input-focus: #3b82f6;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --text-tertiary: #9ca3af;
-  --success-bg: linear-gradient(to right, #ecfdf5, #f0fdfa);
-  --success-text: #065f46;
-  --success-border: rgba(34, 197, 94, 0.5);
+  --background: #faf8f5;
+  --foreground: #2a2019;
+  --text-primary: #2a2019;
+  --text-secondary: #5a4a3a;
+  --input-border: #2a2019;
+  --input-focus: #2a2019;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-eb-garamond);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #111827;
-    --foreground: #f3f4f6;
-    --bg-gradient: linear-gradient(to bottom right, #111827, #1e3a8a, #581c87);
-    --card-bg: rgba(31, 41, 55, 0.8);
-    --card-border: rgba(55, 65, 81, 0.3);
-    --input-bg: #374151;
-    --input-border: #4b5563;
-    --input-focus: #60a5fa;
-    --text-primary: #f3f4f6;
-    --text-secondary: #d1d5db;
-    --text-tertiary: #9ca3af;
-    --success-bg: linear-gradient(to right, rgba(6, 95, 70, 0.3), rgba(13, 148, 136, 0.3));
-    --success-text: #34d399;
-    --success-border: rgba(52, 211, 153, 0.3);
+    --background: #0f0f0f;
+    --foreground: #e8e3dd;
+    --text-primary: #e8e3dd;
+    --text-secondary: #c4b8a8;
+    --input-border: #e8e3dd;
+    --input-focus: #e8e3dd;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-eb-garamond), serif;
   transition: background-color 0.3s, color 0.3s;
+  line-height: 1.6;
+}
+
+/* Hide number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
 }
