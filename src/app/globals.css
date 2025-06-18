@@ -32,6 +32,11 @@ body {
   font-family: var(--font-eb-garamond), serif;
   transition: background-color 0.3s, color 0.3s;
   line-height: 1.6;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 /* Hide number input spinners */
@@ -48,4 +53,12 @@ input[type="number"] {
 /* Thinner underlines for inputs */
 .salary-input {
   border-bottom-width: 1px !important;
+}
+
+/* Enable text selection for inputs */
+input, button {
+  user-select: auto;
+  -webkit-user-select: auto;
+  -moz-user-select: auto;
+  -ms-user-select: auto;
 }

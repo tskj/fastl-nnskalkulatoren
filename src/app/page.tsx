@@ -1,11 +1,115 @@
 'use client';
 
 import { useState } from 'react';
+import { CalendarMonth, monthName } from 'typescript-calendar-date';
+import Month from '@/components/Month';
+
+export type DayStatus = 'ferie' | 'permisjon_med_lonn' | 'permisjon_uten_lonn' | null;
 
 export default function Home() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useState<string>('');
   const [vacationPay, setVacationPay] = useState<number>(12);
+  
+  // Track selected days: key is "year-month-day", value is the status
+  const [dayStates, setDayStates] = useState<Map<string, DayStatus>>(new Map());
+  
+  // Current selection mode for drag operations
+  const [selectionMode, setSelectionMode] = useState<DayStatus>('ferie');
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  // Helper to create day key
+  const getDayKey = (year: number, month: string, day: number): string => {
+    return `${year}-${month}-${day}`;
+  };
+
+  // Update day status
+  const updateDayStatus = (year: number, month: string, day: number, status: DayStatus) => {
+    const key = getDayKey(year, month, day);
+    setDayStates(prev => {
+      const newMap = new Map(prev);
+      if (status === null) {
+        newMap.delete(key);
+      } else {
+        newMap.set(key, status);
+      }
+      return newMap;
+    });
+  };
+
+  // Get day status
+  const getDayStatus = (year: number, month: string, day: number): DayStatus => {
+    const key = getDayKey(year, month, day);
+    return dayStates.get(key) || null;
+  };
+
+  // Start drag operation
+  const startDrag = () => {
+    setIsDragging(true);
+  };
+
+  // End drag operation
+  const endDrag = () => {
+    setIsDragging(false);
+  };
+
+  // Handle drag over day (select day during drag)
+  const handleDragOver = (year: number, month: string, day: number) => {
+    if (isDragging) {
+      updateDayStatus(year, month, day, selectionMode);
+    }
+  };
+
+  // Get selection mode display text
+  const getSelectionModeText = () => {
+    switch (selectionMode) {
+      case 'ferie':
+        return 'ferie';
+      case 'permisjon_med_lonn':
+        return 'permisjon med lønn';
+      case 'permisjon_uten_lonn':
+        return 'fri uten lønn';
+      default:
+        return 'ferie';
+    }
+  };
+
+  // Get selection mode color
+  const getSelectionModeColor = () => {
+    switch (selectionMode) {
+      case 'ferie':
+        return 'text-blue-600 dark:text-blue-400';
+      case 'permisjon_med_lonn':
+        return 'text-green-600 dark:text-green-400';
+      case 'permisjon_uten_lonn':
+        return 'text-orange-600 dark:text-orange-400';
+      default:
+        return 'text-blue-600 dark:text-blue-400';
+    }
+  };
+
+  // Cycle through selection modes
+  const cycleSelectionMode = () => {
+    switch (selectionMode) {
+      case 'ferie':
+        setSelectionMode('permisjon_med_lonn');
+        break;
+      case 'permisjon_med_lonn':
+        setSelectionMode('permisjon_uten_lonn');
+        break;
+      case 'permisjon_uten_lonn':
+        setSelectionMode('ferie');
+        break;
+      default:
+        setSelectionMode('ferie');
+    }
+  };
+
+  // Generate all 12 months for the selected year
+  const months: CalendarMonth[] = Array.from({ length: 12 }, (_, i) => ({
+    year,
+    month: monthName(i + 1)
+  }));
 
   const formatNumber = (value: string): string => {
     // Remove all non-digits
@@ -25,6 +129,8 @@ export default function Home() {
     <div 
       className="min-h-screen px-8 py-16"
       style={{ background: 'var(--background)' }}
+      onMouseUp={endDrag}
+      onMouseLeave={endDrag}
     >
       <div className="max-w-4xl mx-auto">
         <header className="mb-16 text-center">
@@ -100,6 +206,45 @@ export default function Home() {
               />
               .
             </p>
+          </div>
+        </div>
+
+        {/* Selection Mode Toggle */}
+        <div className="mt-16 mb-8 text-center">
+          <div className="text-xl leading-relaxed">
+            <p style={{ color: 'var(--text-primary)' }}>
+              Klikk og dra over dager for å markere{' '}
+              <button
+                onClick={cycleSelectionMode}
+                className={`inline-block bg-transparent border-0 border-b border-solid focus:outline-none mx-1 cursor-pointer font-medium hover:opacity-70 transition-all ${getSelectionModeColor()}`}
+                style={{
+                  borderBottomColor: 'var(--input-border)',
+                  fontSize: 'inherit',
+                  fontFamily: 'inherit'
+                }}
+              >
+                {getSelectionModeText()}
+              </button>
+              .
+            </p>
+          </div>
+        </div>
+
+        {/* Calendar Grid */}
+        <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {months.map((month, index) => (
+              <Month 
+                key={index} 
+                month={month} 
+                getDayStatus={getDayStatus}
+                updateDayStatus={updateDayStatus}
+                startDrag={startDrag}
+                endDrag={endDrag}
+                handleDragOver={handleDragOver}
+                selectionMode={selectionMode}
+              />
+            ))}
           </div>
         </div>
 
