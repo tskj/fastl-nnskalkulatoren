@@ -266,7 +266,7 @@ export default function Home() {
               placeholder="7.5"
               step="0.1"
               />
-              {' '}timer per dag <span className="text-gray-400 dark:text-gray-500">(for en {(hoursPerDay || 0) * 5} timer arbeidsuke)</span>.
+              {' '}timer per dag <span className="opacity-50">(for en {(hoursPerDay || 0) * 5} timer arbeidsuke)</span>.
             </p>
           </div>
 
