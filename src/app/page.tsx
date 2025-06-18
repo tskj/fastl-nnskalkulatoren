@@ -13,8 +13,8 @@ export default function Home() {
   const [isHydrated, setIsHydrated] = useState(false);
 
   const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useLocalStorage<string>('yearlyIncome', '');
-  const [vacationPay, setVacationPay] = useLocalStorage<number>('vacationPay', 12);
-  const [hoursPerDay, setHoursPerDay] = useLocalStorage<number>('hoursPerDay', 7.5);
+  const [vacationPay, setVacationPay] = useLocalStorage<number>('vacationPay');
+  const [hoursPerDay, setHoursPerDay] = useLocalStorage<number>('hoursPerDay');
 
   // Track hydration to avoid mismatch
   useEffect(() => {
@@ -232,8 +232,9 @@ export default function Home() {
               Jeg har{' '}
               <input
                 type="number"
-                value={vacationPay || ''}
-                onChange={(e) => setVacationPay(Number(e.target.value))}
+                value={vacationPay?.toString() || ''}
+                onChange={(e) => setVacationPay(e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="12"
                 className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
                 style={{
                   borderBottomColor: 'var(--input-border)',
@@ -253,8 +254,9 @@ export default function Home() {
               Jeg jobber{' '}
               <input
                 type="number"
-                value={hoursPerDay || ''}
-                onChange={(e) => setHoursPerDay(Number(e.target.value))}
+                value={hoursPerDay?.toString() || ''}
+                onChange={(e) => setHoursPerDay(e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="7.5"
               className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
               style={{
                 borderBottomColor: 'var(--input-border)',
@@ -266,7 +268,7 @@ export default function Home() {
               placeholder="7.5"
               step="0.1"
               />
-              {' '}timer per dag <span className="opacity-50">(for en {isHydrated ? (hoursPerDay || 0) * 5 : ''} timer arbeidsuke)</span>.
+              {' '}timer per dag <span className="opacity-50">(for en {isHydrated ? (hoursPerDay ?? 0) * 5 : ''} timer arbeidsuke)</span>.
             </p>
           </div>
 
