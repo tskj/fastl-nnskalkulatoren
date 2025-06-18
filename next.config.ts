@@ -7,7 +7,6 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   basePath: isProd ? '/fastl-nnskalkulatoren' : '',
   assetPrefix: isProd ? '/fastl-nnskalkulatoren' : '',
-  distDir: isProd ? '.next-build' : '.next',
   images: {
     unoptimized: true
   }
