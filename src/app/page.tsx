@@ -375,7 +375,7 @@ export default function Home() {
             className="text-sm text-red-600 dark:text-red-400 hover:underline cursor-pointer"
             style={{ color: 'var(--text-primary)' }}
           >
-            Nullstill alle data
+            tilbakestill dette skjemaet
           </span>
         </div>
 
