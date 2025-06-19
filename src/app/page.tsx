@@ -473,21 +473,21 @@ export default function Home() {
         {/* Calculation section */}
         <div className="grid md:grid-cols-2 gap-8 text-center md:text-left">
           <div>
-            <p className="text-lg leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-lg leading-relaxed text-opacity-90" style={{ color: 'var(--text-primary)' }}>
               Det er vanlig å regne 260 arbeidsdager per år, som med din arbeidsuke gir{' '}
               {displayHoursPerDay && (
-                <span className="font-medium">
+                <span className="font-medium text-opacity-100">
                   {(displayHoursPerDay * 5 * 52).toLocaleString('nb-NO').replace(/\./g, ',')} timer per år
                 </span>
               )}
-              {!displayHoursPerDay && <span className="opacity-50">0 timer per år</span>}
+              {!displayHoursPerDay && <span className="text-opacity-50">0 timer per år</span>}
               .
             </p>
             
             {yearlyIncomeDisplay && displayHoursPerDay && (
-              <p className="text-lg leading-relaxed mt-4" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-lg leading-relaxed mt-4 text-opacity-90" style={{ color: 'var(--text-primary)' }}>
                 Din nominelle timelønn er{' '}
-                <span className="font-medium">
+                <span className="font-medium text-opacity-100">
                   {Math.round(
                     (parseFloat(yearlyIncomeDisplay.replace(/\s/g, '')) || 0) / 
                     (displayHoursPerDay * 5 * 52)
@@ -503,9 +503,9 @@ export default function Home() {
           <div className="hidden md:block absolute left-1/2 w-px h-20 bg-gradient-to-b from-transparent via-gray-300 dark:via-gray-600 to-transparent transform -translate-x-1/2"></div>
           
           <div>
-            <p className="text-lg leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-lg leading-relaxed text-opacity-90" style={{ color: 'var(--text-primary)' }}>
               I {displayYear} er det faktisk{' '}
-              <span className="font-medium">
+              <span className="font-medium text-opacity-100">
                 {actualWorkDays.toLocaleString('nb-NO')} arbeidsdager
               </span>
               {displayHoursPerDay && (
@@ -516,7 +516,7 @@ export default function Home() {
                     if (displayYear > currentYear) return 'kommer til å tilsvare';
                     return 'tilsvarer';
                   })()}{' '}
-                  <span className="font-medium">
+                  <span className="font-medium text-opacity-100">
                     {(actualWorkDays * displayHoursPerDay).toLocaleString('nb-NO').replace(/\./g, ',')} arbeidstimer
                   </span>
                   {' '}som {(() => {
@@ -559,47 +559,47 @@ export default function Home() {
 
             {yearlyIncomeDisplay && displayHoursPerDay && displayVacationPay && (daysTakenByType.ferie > 0 || daysTakenByType.permisjon_uten_lonn > 0) && (
               <div className="mt-6">
-                <p className="text-lg leading-relaxed" style={{ color: 'var(--text-primary)' }}>
-                  {(() => {
-                    const actualHoursWorked = (actualWorkDays - daysTakenByType.ferie - daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay;
-                    const nominalSalary = parseFloat(yearlyIncomeDisplay.replace(/\s/g, '')) || 0;
-                    
-                    // Actual earnings: 11/12 of nominal salary + vacation pay percentage
-                    const actualEarnings = (nominalSalary * 11/12) + (nominalSalary * (displayVacationPay/100));
-                    const actualHourlyRate = actualHoursWorked > 0 ? actualEarnings / actualHoursWorked : 0;
-                    
-                    const currentYear = new Date().getFullYear();
-                    
-                    return (
-                      <>
+                {(() => {
+                  const actualHoursWorked = (actualWorkDays - daysTakenByType.ferie - daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay;
+                  const nominalSalary = parseFloat(yearlyIncomeDisplay.replace(/\s/g, '')) || 0;
+                  
+                  // Actual earnings: 11/12 of nominal salary + vacation pay percentage
+                  const actualEarnings = (nominalSalary * 11/12) + (nominalSalary * (displayVacationPay/100));
+                  const actualHourlyRate = actualHoursWorked > 0 ? actualEarnings / actualHoursWorked : 0;
+                  
+                  const currentYear = new Date().getFullYear();
+                  
+                  return (
+                    <>
+                      <p className="text-lg leading-relaxed text-opacity-90" style={{ color: 'var(--text-primary)' }}>
                         {displayYear < currentYear ? 'Du jobbet egentlig' : 'Du kommer egentlig til å jobbe'}{' '}
-                        <span className="font-medium">
+                        <span className="font-medium text-opacity-100">
                           {actualHoursWorked.toLocaleString('nb-NO').replace(/\./g, ',')} timer
                         </span>
                         .
-                        <br /><br />
+                      </p>
+                      <p className="text-lg leading-relaxed mt-4 text-opacity-90" style={{ color: 'var(--text-primary)' }}>
                         Din faktiske årslønn blir{' '}
-                        <span className="font-medium">
+                        <span className="font-medium text-opacity-100">
                           {Math.round(actualEarnings).toLocaleString('nb-NO')} kroner
                         </span>
                         , som gir deg en faktisk timelønn på{' '}
-                        <span className="font-medium">
+                        <span className="font-medium text-opacity-100">
                           {Math.round(actualHourlyRate).toLocaleString('nb-NO')} kroner per time
                         </span>
                         .
-                        <br /><br />
-                        <details className="mt-2">
-                          <summary className="cursor-pointer text-sm opacity-70 hover:opacity-100">
-                            Vis beregning
-                          </summary>
-                          <p className="text-sm mt-2 opacity-70">
-                            Faktisk årslønn = 11/12 av nominell lønn + {displayVacationPay.toString().replace('.', ',')}% feriepenger
-                          </p>
-                        </details>
-                      </>
-                    );
-                  })()}
-                </p>
+                      </p>
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-sm opacity-70 hover:opacity-100">
+                          Vis beregning
+                        </summary>
+                        <p className="text-sm mt-2 opacity-70">
+                          Faktisk årslønn = 11/12 av nominell lønn + {displayVacationPay.toString().replace('.', ',')}% feriepenger
+                        </p>
+                      </details>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>
