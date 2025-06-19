@@ -99,7 +99,7 @@ export default function Home() {
       const prevMap = new Map(Object.entries(prevObj));
       const newMap = updateFn(prevMap);
       return Object.fromEntries(newMap.entries());
-    }) as (prev: Record<string, DayStatus>) => Record<string, DayStatus>);
+    }) as any as Record<string, DayStatus>);
   }, [setDayStatesObj]);
 
   // Calendar fade in/out animation with proper sequencing
