@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useDeferredValue, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { CalendarMonth, monthName, CalendarDate, addDays, dayOfWeek, datesEqual, monthNumber } from 'typescript-calendar-date';
 import Month from '@/components/Month';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -94,11 +94,14 @@ export default function Home() {
 
   // Convert to Map for easier usage
   const dayStates = useMemo(() => new Map(Object.entries(dayStatesObj)), [dayStatesObj]);
-  const setDayStates = (updateFn: (prev: Map<string, DayStatus>) => Map<string, DayStatus>) => {
-    const newMap = updateFn(dayStates);
-    const newObj = Object.fromEntries(newMap.entries());
-    setDayStatesObj(newObj);
-  };
+  const setDayStates = useCallback((updateFn: (prev: Map<string, DayStatus>) => Map<string, DayStatus>) => {
+    setDayStatesObj(prevObj => {
+      const prevMap = new Map(Object.entries(prevObj));
+      const newMap = updateFn(prevMap);
+      const newObj = Object.fromEntries(newMap.entries());
+      return newObj;
+    });
+  }, [setDayStatesObj]);
 
   // Calendar fade in/out animation with proper sequencing
   const [calendarKey, setCalendarKey] = useState(displayYear);
@@ -143,12 +146,13 @@ export default function Home() {
 
   // Update day status
   const updateDayStatus = (year: number, month: string, day: number, status: DayStatus) => {
-    const key = getDayKey(year, month, day);
-    const currentStatus = dayStates.get(key) || null;
+    const key = `${year}-${month}-${day}`;
     
-    // Only update if the status is actually changing
-    if (currentStatus !== status) {
-      setDayStates(prev => {
+    setDayStates(prev => {
+      const currentStatus = prev.get(key) || null;
+      
+      // Only update if the status is actually changing
+      if (currentStatus !== status) {
         const newMap = new Map(prev);
         if (status === null) {
           newMap.delete(key);
@@ -156,8 +160,9 @@ export default function Home() {
           newMap.set(key, status);
         }
         return newMap;
-      });
-    }
+      }
+      return prev;
+    });
   };
 
   // Get day status
@@ -168,60 +173,7 @@ export default function Home() {
 
 
   // Mathematical helper functions for line intersection
-  const getDayBoxFromCoordinates = (x: number, y: number, monthIndex: number) => {
-    const monthElement = document.querySelector(`[data-month-index="${monthIndex}"]`);
-    if (!monthElement) return null;
-    
-    const calendarGrid = monthElement.querySelector('.calendar-grid');
-    if (!calendarGrid) return null;
-    
-    const gridRect = calendarGrid.getBoundingClientRect();
-    const relativeX = x - gridRect.left;
-    const relativeY = y - gridRect.top;
-    
-    const cellWidth = gridRect.width / 7;
-    const cellHeight = gridRect.height / 6;
-    
-    const col = Math.floor(relativeX / cellWidth);
-    const row = Math.floor(relativeY / cellHeight);
-    
-    if (col >= 0 && col < 7 && row >= 0 && row < 6) {
-      const cellIndex = row * 7 + col;
-      const cellCenterX = gridRect.left + (col + 0.5) * cellWidth;
-      const cellCenterY = gridRect.top + (row + 0.5) * cellHeight;
-      
-      return {
-        row,
-        col,
-        cellIndex,
-        centerX: cellCenterX,
-        centerY: cellCenterY,
-        relativeX: relativeX - col * cellWidth,
-        relativeY: relativeY - row * cellHeight
-      };
-    }
-    return null;
-  };
   
-  const getDayFromCellIndex = (cellIndex: number, monthIndex: number) => {
-    const month = months[monthIndex];
-    if (!month) return null;
-    
-    const daysInMonth = new Date(month.year, monthNumber(month.month), 0).getDate();
-    const firstDayOfWeek = dayOfWeek({ year: month.year, month: month.month, day: 1 });
-    const weekDayMap = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5, sun: 6 };
-    const startPosition = weekDayMap[firstDayOfWeek];
-    
-    const dayIndex = cellIndex - startPosition;
-    if (dayIndex >= 0 && dayIndex < daysInMonth) {
-      return {
-        year: month.year,
-        month: month.month,
-        day: dayIndex + 1
-      };
-    }
-    return null;
-  };
   
   const getLineIntersectedCells = (x1: number, y1: number, x2: number, y2: number, monthIndex: number) => {
     const monthElement = document.querySelector(`[data-month-index="${monthIndex}"]`);
@@ -277,38 +229,6 @@ export default function Home() {
     return Array.from(intersectedCells);
   };
   
-  const processTouchedDays = (cellIndices: number[], monthIndex: number) => {
-    let hasNewDays = false;
-    
-    cellIndices.forEach(cellIndex => {
-      const dayInfo = getDayFromCellIndex(cellIndex, monthIndex);
-      if (!dayInfo) return;
-      
-      // Check if it's a holiday or weekend - don't process those
-      const date: CalendarDate = { year: dayInfo.year, month: dayInfo.month, day: dayInfo.day };
-      if (isHolidayChecker(date) || dayOfWeek(date) === 'sat' || dayOfWeek(date) === 'sun') {
-        return;
-      }
-      
-      const dayKey = getDayKey(dayInfo.year, dayInfo.month, dayInfo.day);
-      
-      if (!touchedDaysSetRef.current.has(dayKey)) {
-        touchedDaysSetRef.current.add(dayKey);
-        hasNewDays = true;
-        
-        if (dragAction === 'add') {
-          updateDayStatus(dayInfo.year, dayInfo.month, dayInfo.day, selectionMode);
-        } else {
-          updateDayStatus(dayInfo.year, dayInfo.month, dayInfo.day, null);
-        }
-      }
-    });
-    
-    // Only trigger re-render if we found new days
-    if (hasNewDays) {
-      touchedDaysCountRef.current = touchedDaysSetRef.current.size;
-    }
-  };
   
   
   // Simple drag over handler (legacy fallback)
@@ -353,7 +273,6 @@ export default function Home() {
             const cellHeight = gridRect.height / 6;
             
             // Find which cell this day corresponds to
-            const daysInMonth = new Date(year, monthNumber(month), 0).getDate();
             const firstDayOfWeek = dayOfWeek({ year, month, day: 1 });
             const weekDayMap = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5, sun: 6 };
             const startPosition = weekDayMap[firstDayOfWeek];
@@ -434,6 +353,69 @@ export default function Home() {
   // Memoize holiday checker function
   const isHolidayChecker = useCallback((date: CalendarDate) => isNorwegianHoliday(date, holidays), [holidays]);
   
+  
+  // Generate all 12 months for the selected year (memoized to avoid recalculation)
+  const months: CalendarMonth[] = useMemo(() =>
+    Array.from({ length: 12 }, (_, i) => ({
+      year: calendarKey,
+      month: monthName(i + 1)
+    })), [calendarKey]);
+
+  const getDayFromCellIndex = (cellIndex: number, monthIndex: number) => {
+    // Calculate month info directly instead of using months array to avoid dependency
+    const monthNum = monthIndex + 1;
+    const year = calendarKey;
+    const month = monthName(monthNum);
+    
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+    const firstDayOfWeek = dayOfWeek({ year, month, day: 1 });
+    const weekDayMap = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5, sun: 6 };
+    const startPosition = weekDayMap[firstDayOfWeek];
+    
+    const dayIndex = cellIndex - startPosition;
+    if (dayIndex >= 0 && dayIndex < daysInMonth) {
+      return {
+        year,
+        month,
+        day: dayIndex + 1
+      };
+    }
+    return null;
+  };
+
+  const processTouchedDays = (cellIndices: number[], monthIndex: number) => {
+    let hasNewDays = false;
+    
+    cellIndices.forEach(cellIndex => {
+      const dayInfo = getDayFromCellIndex(cellIndex, monthIndex);
+      if (!dayInfo) return;
+      
+      // Check if it's a holiday or weekend - don't process those
+      const date: CalendarDate = { year: dayInfo.year, month: dayInfo.month, day: dayInfo.day };
+      if (isHolidayChecker(date) || dayOfWeek(date) === 'sat' || dayOfWeek(date) === 'sun') {
+        return;
+      }
+      
+      const dayKey = `${dayInfo.year}-${dayInfo.month}-${dayInfo.day}`;
+      
+      if (!touchedDaysSetRef.current.has(dayKey)) {
+        touchedDaysSetRef.current.add(dayKey);
+        hasNewDays = true;
+        
+        if (dragAction === 'add') {
+          updateDayStatus(dayInfo.year, dayInfo.month, dayInfo.day, selectionMode);
+        } else {
+          updateDayStatus(dayInfo.year, dayInfo.month, dayInfo.day, null);
+        }
+      }
+    });
+    
+    // Only trigger re-render if we found new days
+    if (hasNewDays) {
+      touchedDaysCountRef.current = touchedDaysSetRef.current.size;
+    }
+  };
+  
   // High-performance mouse move handler for drag operations
   const handleCalendarMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !lastMousePosRef.current || !dragStartInfoRef.current) return;
@@ -453,14 +435,8 @@ export default function Home() {
     }
     
     lastMousePosRef.current = currentPos;
-  }, [isDragging, dragAction, selectionMode, isHolidayChecker]);
-  
-  // Generate all 12 months for the selected year (memoized to avoid recalculation)
-  const months: CalendarMonth[] = useMemo(() =>
-    Array.from({ length: 12 }, (_, i) => ({
-      year: calendarKey,
-      month: monthName(i + 1)
-    })), [calendarKey]);
+  }, [isDragging]);
+
 
   // Generate year options (current year ± 3)
   const yearOptions = useMemo(() => {

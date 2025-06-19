@@ -42,7 +42,7 @@ export function useLocalStorage<T>(key: string, initialValue: T | (() => T), yea
         console.warn(`Error reading localStorage key "${storageKey}":`, error);
       }
     }
-  }, [storageKey, year, initialValue]);
+  }, [storageKey, year]);
 
   const setValue = (value: T) => {
     try {
