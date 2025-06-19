@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { CalendarMonth, monthName, CalendarDate, addDays, dayOfWeek, datesEqual, monthNumber } from 'typescript-calendar-date';
+import { CalendarMonth, monthName, CalendarDate, addDays, dayOfWeek, datesEqual } from 'typescript-calendar-date';
 import Month from '@/components/Month';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
@@ -435,7 +435,7 @@ export default function Home() {
     }
     
     lastMousePosRef.current = currentPos;
-  }, [isDragging]);
+  }, [isDragging]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // Generate year options (current year ± 3)
