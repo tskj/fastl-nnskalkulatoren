@@ -98,7 +98,7 @@ export default function Home() {
     setDayStatesObj((prevObj: Record<string, DayStatus>) => {
       const prevMap = new Map(Object.entries(prevObj));
       const newMap = updateFn(prevMap);
-      return Object.fromEntries(newMap.entries());
+      return Object.fromEntries(newMap.entries() as Iterable<[string, DayStatus]>);
     });
   }, [setDayStatesObj]);
 
