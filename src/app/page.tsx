@@ -95,11 +95,10 @@ export default function Home() {
   // Convert to Map for easier usage
   const dayStates = useMemo(() => new Map(Object.entries(dayStatesObj)), [dayStatesObj]);
   const setDayStates = useCallback((updateFn: (prev: Map<string, DayStatus>) => Map<string, DayStatus>) => {
-    setDayStatesObj(((prevObj: any) => {
+    setDayStatesObj((prevObj: Record<string, DayStatus>) => {
       const prevMap = new Map(Object.entries(prevObj));
       const newMap = updateFn(prevMap);
-      return Object.fromEntries(newMap.entries());
-    }) as any as Record<string, DayStatus>);
+      return Object.fromEntries(newMap.entries()) as Record<string, DayStatus>;
     });
   }, [setDayStatesObj]);
 
