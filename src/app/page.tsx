@@ -84,8 +84,6 @@ export default function Home() {
   const displayHoursPerDay = isHydrated ? hoursPerDay : null;
   const displayHoursPerDayText = isHydrated ? hoursPerDayDisplay : '';
 
-  // Defer year changes to avoid blocking UI
-  const deferredYear = useDeferredValue(displayYear);
 
   // Ref for dropdown click-outside detection
   const dropdownRef = useRef<HTMLDivElement>(null);
