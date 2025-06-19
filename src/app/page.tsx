@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useDeferredValue, useMemo, useEffect, useRef } from 'react';
-import { CalendarMonth, monthName, CalendarDate, addDays, dayOfWeek, datesEqual, Month as MonthType } from 'typescript-calendar-date';
+import { CalendarMonth, monthName, CalendarDate, addDays, dayOfWeek, datesEqual } from 'typescript-calendar-date';
 import Month from '@/components/Month';
-import { useLocalStorage, clearAllLocalStorage } from '@/hooks/useLocalStorage';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 export type DayStatus = 'ferie' | 'permisjon_med_lonn' | 'permisjon_uten_lonn' | null;
 
@@ -53,7 +53,7 @@ function getNorwegianHolidays(year: number): CalendarDate[] {
 // Check if a date is a Norwegian public holiday (including Sundays)
 function isNorwegianHoliday(date: CalendarDate, holidays: CalendarDate[]): boolean {
   // Sunday is always a public holiday
-  if (dayOfWeek(date) === 0) return true;
+  if (dayOfWeek(date) === 'sun') return true;
   
   // Check if date matches any of the specific holidays
   return holidays.some(holiday => datesEqual(date, holiday));
@@ -95,7 +95,7 @@ export default function Home() {
   const [isCalendarReady, setIsCalendarReady] = useState(false);
 
   // Convert to Map for easier usage
-  const dayStates = new Map(Object.entries(dayStatesObj));
+  const dayStates = useMemo(() => new Map(Object.entries(dayStatesObj)), [dayStatesObj]);
   const setDayStates = (updateFn: (prev: Map<string, DayStatus>) => Map<string, DayStatus>) => {
     const newMap = updateFn(dayStates);
     const newObj = Object.fromEntries(newMap.entries());
@@ -236,7 +236,7 @@ export default function Home() {
       permisjon_uten_lonn: 0
     };
 
-    for (const [key, status] of dayStates) {
+    for (const [, status] of dayStates) {
       if (status && status in counts) {
         counts[status as keyof typeof counts]++;
       }
@@ -244,29 +244,6 @@ export default function Home() {
     return counts;
   }, [dayStates, isHydrated]);
 
-  // Calculate monetary impact for each type (for future use)
-  const monetaryImpact = useMemo(() => {
-    if (!yearlyIncomeDisplay || !displayHoursPerDay) {
-      return {
-        vacationLoss: 0,
-        unpaidLeaveLoss: 0,
-        paidLeaveImpact: 0
-      };
-    }
-
-    const yearlySalary = parseFloat(yearlyIncomeDisplay.replace(/\s/g, '')) || 0;
-    const totalHoursPerYear = displayHoursPerDay * 5 * 52;
-    const nominalHourlyRate = yearlySalary / totalHoursPerYear;
-
-    return {
-      // Vacation: lost work time but paid via vacation pay
-      vacationLoss: daysTakenByType.ferie * displayHoursPerDay * nominalHourlyRate,
-      // Unpaid leave: direct loss of income
-      unpaidLeaveLoss: daysTakenByType.permisjon_uten_lonn * displayHoursPerDay * nominalHourlyRate,
-      // Paid leave: no direct loss (paid as normal work day)
-      paidLeaveImpact: 0
-    };
-  }, [yearlyIncomeDisplay, displayHoursPerDay, daysTakenByType]);
 
   // Calculate actual work days in the year (excluding weekends and Norwegian holidays)
   const actualWorkDays = useMemo(() => {
@@ -381,7 +358,6 @@ export default function Home() {
                     }
                   }
                 }}
-                placeholder="7,5"
                 className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
                 style={{
                   borderBottomColor: 'var(--input-border)',
@@ -390,6 +366,7 @@ export default function Home() {
                   fontFamily: 'inherit',
                   width: '50px'
                 }}
+                placeholder="7,5"
                 step="0.1"
               />
               {' '}timer per dag
@@ -420,7 +397,6 @@ export default function Home() {
                     }
                   }
                 }}
-                placeholder="12"
                 className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
                 style={{
                   borderBottomColor: 'var(--input-border)',

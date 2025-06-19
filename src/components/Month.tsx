@@ -20,7 +20,7 @@ interface MonthProps {
   isHoliday: (date: CalendarDate) => boolean;
 }
 
-function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handleDragOver, selectionMode, dragAction, isHoliday }: MonthProps) {
+function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handleDragOver, selectionMode, isHoliday }: MonthProps) {
   // Get month name and year
   const monthNames = [
     'januar', 'februar', 'mars', 'april', 'mai', 'juni',
@@ -98,9 +98,7 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
           const isNorwegianHoliday = isHoliday(day);
 
           // Clean approach: use your library to verify grid adjacency
-          const weekDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
           const currentDayOfWeek = dayOfWeek(day);
-          const currentIndex = weekDays.indexOf(currentDayOfWeek);
 
           // Simple approach: check if consecutive days are truly adjacent in the calendar grid
           const leftDay = day.day > 1 ? { year: day.year, month: day.month, day: day.day - 1 } : null;
