@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useDeferredValue, useMemo, useEffect, useRef } from 'react';
+import { useState, useDeferredValue, useMemo, useEffect, useRef, useCallback } from 'react';
 import { CalendarMonth, monthName, CalendarDate, addDays, dayOfWeek, datesEqual } from 'typescript-calendar-date';
 import Month from '@/components/Month';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -102,12 +102,28 @@ export default function Home() {
     setDayStatesObj(newObj);
   };
 
-  // Delay calendar rendering until year data is loaded
+  // Calendar fade in/out animation with proper sequencing
+  const [calendarKey, setCalendarKey] = useState(displayYear);
+  
   useEffect(() => {
-    setIsCalendarReady(false);
-    const timer = setTimeout(() => setIsCalendarReady(true), 100);
-    return () => clearTimeout(timer);
-  }, [displayYear]);
+    if (displayYear !== calendarKey) {
+      // Fade out first
+      setIsCalendarReady(false);
+      
+      // Wait for fade-out to complete, then switch content and fade in
+      const timer = setTimeout(() => {
+        setCalendarKey(displayYear);
+        // Small delay to ensure content is rendered before fade-in
+        setTimeout(() => setIsCalendarReady(true), 16);
+      }, 300); // Match CSS transition duration
+      
+      return () => clearTimeout(timer);
+    } else if (!isCalendarReady) {
+      // Initial render
+      const timer = setTimeout(() => setIsCalendarReady(true), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [displayYear, calendarKey, isCalendarReady]);
 
   // Current selection mode for drag operations
   const [selectionMode, setSelectionMode] = useState<DayStatus>('ferie');
@@ -142,6 +158,7 @@ export default function Home() {
 
   // Start drag operation
   const startDrag = (action: 'add' | 'remove') => {
+    lastProcessedDayRef.current = ''; // Clear last processed day
     setIsDragging(true);
     setDragAction(action);
   };
@@ -151,14 +168,29 @@ export default function Home() {
     setIsDragging(false);
   };
 
+  // Track last processed day to avoid redundant updates
+  const lastProcessedDayRef = useRef<string>('');
+
   // Handle drag over day (select/deselect day during drag)
   const handleDragOver = (year: number, month: string, day: number) => {
-    if (isDragging) {
-      if (dragAction === 'add') {
-        updateDayStatus(year, month, day, selectionMode);
-      } else {
-        updateDayStatus(year, month, day, null);
-      }
+    if (!isDragging) return;
+    
+    const dayKey = getDayKey(year, month, day);
+    
+    // Skip if we just processed this day
+    if (lastProcessedDayRef.current === dayKey) return;
+    lastProcessedDayRef.current = dayKey;
+    
+    // Check if it's a holiday or weekend - don't process those
+    const date: CalendarDate = { year, month, day };
+    if (isHolidayChecker(date) || dayOfWeek(date) === 'sat' || dayOfWeek(date) === 'sun') {
+      return;
+    }
+    
+    if (dragAction === 'add') {
+      updateDayStatus(year, month, day, selectionMode);
+    } else {
+      updateDayStatus(year, month, day, null);
     }
   };
 
@@ -207,12 +239,18 @@ export default function Home() {
     }
   };
 
+  // Memoize Norwegian holidays calculation (expensive)
+  const holidays = useMemo(() => getNorwegianHolidays(calendarKey), [calendarKey]);
+  
+  // Memoize holiday checker function
+  const isHolidayChecker = useCallback((date: CalendarDate) => isNorwegianHoliday(date, holidays), [holidays]);
+  
   // Generate all 12 months for the selected year (memoized to avoid recalculation)
   const months: CalendarMonth[] = useMemo(() =>
     Array.from({ length: 12 }, (_, i) => ({
-      year: deferredYear,
+      year: calendarKey,
       month: monthName(i + 1)
-    })), [deferredYear]);
+    })), [calendarKey]);
 
   // Generate year options (current year ± 3)
   const yearOptions = useMemo(() => {
@@ -270,6 +308,20 @@ export default function Home() {
     return workDayCount;
   }, [displayYear]);
 
+
+  // Global mouse up handler to end drag anywhere
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
+    }
+  }, [isDragging]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -485,30 +537,43 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Calendar Grid */}
-        <div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-1">
-            {isCalendarReady && (
-              <div className="contents animate-fadeIn">
-                {months.map((month, index) => {
-                  const holidays = getNorwegianHolidays(displayYear);
-                  return (
-                    <Month
-                      key={`${displayYear}-${index}`}
-                      month={month}
-                      getDayStatus={getDayStatus}
-                      updateDayStatus={updateDayStatus}
-                      startDrag={startDrag}
-                      dragAction={dragAction}
-                      endDrag={endDrag}
-                      handleDragOver={handleDragOver}
-                      selectionMode={selectionMode}
-                      isHoliday={(date) => isNorwegianHoliday(date, holidays)}
-                    />
-                  );
-                })}
-              </div>
-            )}
+        {/* Calendar Grid with fixed height and smooth transitions */}
+        <div 
+          className="calendar-container min-h-[1000px] lg:min-h-[800px] xl:min-h-[600px]"
+          onMouseMove={(e) => {
+            if (isDragging) {
+              // Find the day element under the mouse
+              const element = document.elementFromPoint(e.clientX, e.clientY);
+              if (element && element.closest('.calendar-day')) {
+                const dayElement = element.closest('.calendar-day');
+                const dayKey = dayElement?.getAttribute('data-day-key');
+                if (dayKey) {
+                  const [year, month, day] = dayKey.split('-');
+                  handleDragOver(parseInt(year), month, parseInt(day));
+                }
+              }
+            }
+          }}
+        >
+          <div className={`
+            grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-1
+            transition-all duration-300 ease-in-out
+            ${isCalendarReady ? 'opacity-100' : 'opacity-0'}
+          `}>
+            {isHydrated && months.map((month, index) => (
+              <Month
+                key={`${calendarKey}-${index}`}
+                month={month}
+                getDayStatus={getDayStatus}
+                updateDayStatus={updateDayStatus}
+                startDrag={startDrag}
+                dragAction={dragAction}
+                endDrag={endDrag}
+                handleDragOver={handleDragOver}
+                selectionMode={selectionMode}
+                isHoliday={isHolidayChecker}
+              />
+            ))}
           </div>
         </div>
 

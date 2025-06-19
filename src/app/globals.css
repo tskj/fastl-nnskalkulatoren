@@ -116,6 +116,15 @@ input, button {
   animation: fadeInToHalf 0.5s ease-out;
 }
 
+/* Calendar container smooth transitions */
+.calendar-container {
+  transition: all 0.3s ease-in-out;
+}
+
+.calendar-container .grid {
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out, filter 0.3s ease-in-out;
+}
+
 /* Custom radio button styling */
 .custom-radio {
   position: relative;

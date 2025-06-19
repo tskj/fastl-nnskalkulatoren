@@ -53,6 +53,11 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
     handleDragOver(day.year, day.month, day.day);
   };
 
+  // Handle mouse over for more responsive dragging
+  const handleMouseOver = (day: CalendarDate) => {
+    handleDragOver(day.year, day.month, day.day);
+  };
+
   // Get number of days in this month
   const daysInMonth = numberOfDaysInMonth(month);
 
@@ -184,6 +189,7 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
           return (
             <div
               key={`${day.year}-${day.month}-${day.day}`}
+              data-day-key={`${day.year}-${day.month}-${day.day}`}
               className={`
                 calendar-day flex items-center justify-center text-sm
                 transition-all duration-200
@@ -200,6 +206,7 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
               style={statusStyle.style}
               onMouseDown={() => !isWeekend && !isNorwegianHoliday && handleMouseDown(day)}
               onMouseEnter={() => !isWeekend && !isNorwegianHoliday && handleMouseEnter(day)}
+              onMouseOver={() => !isWeekend && !isNorwegianHoliday && handleMouseOver(day)}
               onMouseUp={endDrag}
             >
               {day.day}
