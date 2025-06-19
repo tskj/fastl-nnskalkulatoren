@@ -113,7 +113,7 @@ export default function Home() {
   const [selectionMode, setSelectionMode] = useState<DayStatus>('ferie');
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragAction, setDragAction] = useState<'add' | 'remove'>('add');
-  const [calculationMethod, setCalculationMethod] = useLocalStorage<'standard' | 'generous' | 'stingy'>('calculationMethod', 'standard');
+  const [calculationMethod, setCalculationMethod] = useLocalStorage<'standard' | 'generous' | 'stingy' | 'anal'>('calculationMethod', 'standard');
 
   // Helper to create day key
   const getDayKey = (year: number, month: string, day: number): string => {
@@ -309,14 +309,20 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <header className="mb-16 text-center">
           <h1
-            className="text-5xl font-medium mb-6"
+            className="text-5xl font-medium mb-2"
             style={{ color: 'var(--text-primary)' }}
           >
-            Fastlønnskalkulator
+            Feriepengekalulator
           </h1>
+          <p
+            className="text-lg opacity-70"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            for deg som har fastlønn
+          </p>
         </header>
 
-        <div className="max-w-2xl mx-auto space-y-12">
+        <div className="max-w-2xl mx-auto space-y-8">
           <div className="text-xl leading-relaxed text-justify">
             <p style={{ color: 'var(--text-primary)' }}>
               Min nominelle årslønn er{' '}
@@ -502,7 +508,7 @@ export default function Home() {
         </div>
 
         {/* Elegant divider */}
-        <div className="mt-1 mb-8 flex justify-center">
+        <div className="mt-6 mb-8 flex justify-center">
           <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
         </div>
 
@@ -553,13 +559,8 @@ export default function Home() {
                     return 'tilsvarer';
                   })()}{' '}
                   <span className="font-medium text-opacity-100">
-                    {(actualWorkDays * displayHoursPerDay).toLocaleString('nb-NO').replace(/\./g, ',')} arbeidstimer
+                    {(actualWorkDays * displayHoursPerDay).toLocaleString('nb-NO').replace(/\./g, ',')} tilgjengelige arbeidstimer i året
                   </span>
-                  {' '}som {(() => {
-                    const currentYear = new Date().getFullYear();
-                    if (displayYear < currentYear) return 'du jobbet';
-                    return 'du kommer til å jobbe';
-                  })()}
                 </span>
               )}
               .
@@ -630,6 +631,15 @@ export default function Home() {
                         ? `faktisk årslønn = (nominell lønn - feriedager - fri uten lønn*) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
                         : `faktisk årslønn = (nominell lønn - feriedager) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                       break;
+                    case 'anal':
+                      const realHourlyRate = nominalSalary / (actualWorkDays * displayHoursPerDay);
+                      const allLeaveDeduction = (daysTakenByType.ferie + daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay * realHourlyRate;
+                      const analBase = nominalSalary - allLeaveDeduction;
+                      actualEarnings = analBase + (analBase * (displayVacationPay/100));
+                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0
+                        ? `faktisk årslønn = (nominell lønn - alle fridager*) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`
+                        : `faktisk årslønn = (nominell lønn - feriedager) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`;
+                      break;
                     default:
                       const defaultBase = (nominalSalary * 11/12) - unpaidLeaveDeduction;
                       actualEarnings = defaultBase + (defaultBase * (displayVacationPay/100));
@@ -660,10 +670,7 @@ export default function Home() {
                         <span className="font-medium text-opacity-100">
                           {Math.round(actualEarnings).toLocaleString('nb-NO')} kroner
                         </span>
-                        , som gir deg en faktisk timelønn på{' '}
-                        <span className="font-medium text-opacity-100">
-                          {Math.round(actualHourlyRate).toLocaleString('nb-NO')} kroner per time
-                        </span>
+                        <span className="opacity-60"> (som gir en reell timelønn på {Math.round(actualHourlyRate).toLocaleString('nb-NO')} kr/time for timene du faktisk jobbet)</span>
                         .
                       </p>
                       <details className="mt-2">
@@ -679,7 +686,7 @@ export default function Home() {
                                   name="calculationMethod"
                                   value="standard"
                                   checked={calculationMethod === 'standard'}
-                                  onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy')}
+                                  onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy' | 'anal')}
                                 />
                                 <div className="custom-radio-circle"></div>
                               </div>
@@ -695,7 +702,7 @@ export default function Home() {
                                   name="calculationMethod"
                                   value="generous"
                                   checked={calculationMethod === 'generous'}
-                                  onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy')}
+                                  onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy' | 'anal')}
                                 />
                                 <div className="custom-radio-circle"></div>
                               </div>
@@ -711,12 +718,28 @@ export default function Home() {
                                   name="calculationMethod"
                                   value="stingy"
                                   checked={calculationMethod === 'stingy'}
-                                  onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy')}
+                                  onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy' | 'anal')}
                                 />
                                 <div className="custom-radio-circle"></div>
                               </div>
                               <span className="text-sm">
                                 Arbeidsgiveren min er kjip og trekker meg for all ferien jeg tar
+                              </span>
+                            </label>
+                            
+                            <label className="flex items-start space-x-3 cursor-pointer">
+                              <div className="custom-radio">
+                                <input
+                                  type="radio"
+                                  name="calculationMethod"
+                                  value="anal"
+                                  checked={calculationMethod === 'anal'}
+                                  onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy' | 'anal')}
+                                />
+                                <div className="custom-radio-circle"></div>
+                              </div>
+                              <span className="text-sm">
+                                Arbeidsgiveren min er pedantisk og regner ut timelønnen basert på faktiske arbeidsdager i året
                               </span>
                             </label>
                           </div>
