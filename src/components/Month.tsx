@@ -17,9 +17,10 @@ interface MonthProps {
   handleDragOver: (year: number, month: string, day: number) => void;
   selectionMode: DayStatus;
   dragAction: 'add' | 'remove';
+  isHoliday: (date: CalendarDate) => boolean;
 }
 
-function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handleDragOver, selectionMode, dragAction }: MonthProps) {
+function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handleDragOver, selectionMode, dragAction, isHoliday }: MonthProps) {
   // Get month name and year
   const monthNames = [
     'januar', 'februar', 'mars', 'april', 'mai', 'juni',
@@ -92,7 +93,9 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
         {days.map((day) => {
           const dayWeekDay = dayOfWeek(day);
           const isWeekend = dayWeekDay === 'sat' || dayWeekDay === 'sun';
+          const isSunday = dayWeekDay === 'sun';
           const dayStatus = getDayStatus(day.year, day.month, day.day);
+          const isNorwegianHoliday = isHoliday(day);
 
           // Clean approach: use your library to verify grid adjacency
           const weekDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -130,10 +133,13 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
 
           // Get styling based on status
           const getStatusStyle = () => {
+            // Holiday styling takes precedence for text color, but user selections still show
+            const holidayTextColor = (isNorwegianHoliday || isSunday) ? 'text-red-600 dark:text-red-400 font-medium' : '';
+            
             if (!dayStatus) {
               return {
-                className: '',
-                style: { color: 'var(--text-primary)' }
+                className: holidayTextColor,
+                style: { color: (isNorwegianHoliday || isSunday) ? undefined : 'var(--text-primary)' }
               };
             }
 
@@ -142,15 +148,15 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
             switch (dayStatus) {
               case 'ferie':
                 bgColor = 'bg-blue-200 dark:bg-blue-800';
-                textColor = 'text-blue-900 dark:text-blue-100';
+                textColor = (isNorwegianHoliday || isSunday) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-blue-900 dark:text-blue-100';
                 break;
               case 'permisjon_med_lonn':
                 bgColor = 'bg-green-200 dark:bg-green-800';
-                textColor = 'text-green-900 dark:text-green-100';
+                textColor = (isNorwegianHoliday || isSunday) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-green-900 dark:text-green-100';
                 break;
               case 'permisjon_uten_lonn':
                 bgColor = 'bg-orange-200 dark:bg-orange-800';
-                textColor = 'text-orange-900 dark:text-orange-100';
+                textColor = (isNorwegianHoliday || isSunday) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-orange-900 dark:text-orange-100';
                 break;
             }
 
@@ -186,14 +192,16 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
                 ${statusStyle.className}
                 ${isWeekend
                   ? 'opacity-50'
-                  : dayStatus 
-                    ? 'cursor-pointer'
-                    : 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30'
+                  : isNorwegianHoliday
+                    ? 'cursor-default'
+                    : dayStatus 
+                      ? 'cursor-pointer'
+                      : 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30'
                 }
               `}
               style={statusStyle.style}
-              onMouseDown={() => !isWeekend && handleMouseDown(day)}
-              onMouseEnter={() => !isWeekend && handleMouseEnter(day)}
+              onMouseDown={() => !isWeekend && !isNorwegianHoliday && handleMouseDown(day)}
+              onMouseEnter={() => !isWeekend && !isNorwegianHoliday && handleMouseEnter(day)}
               onMouseUp={endDrag}
             >
               {day.day}

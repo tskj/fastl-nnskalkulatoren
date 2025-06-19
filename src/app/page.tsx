@@ -1,11 +1,63 @@
 'use client';
 
 import { useState, useDeferredValue, useMemo, useEffect, useRef } from 'react';
-import { CalendarMonth, monthName } from 'typescript-calendar-date';
+import { CalendarMonth, monthName, CalendarDate, addDays, dayOfWeek, datesEqual, Month as MonthType } from 'typescript-calendar-date';
 import Month from '@/components/Month';
 import { useLocalStorage, clearAllLocalStorage } from '@/hooks/useLocalStorage';
 
 export type DayStatus = 'ferie' | 'permisjon_med_lonn' | 'permisjon_uten_lonn' | null;
+
+// Calculate Easter Sunday for a given year using the anonymous Gregorian algorithm
+function calculateEaster(year: number): CalendarDate {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const n = Math.floor((h + l - 7 * m + 114) / 31);
+  const p = (h + l - 7 * m + 114) % 31;
+  
+  return { year, month: monthName(n), day: p + 1 };
+}
+
+// Get all Norwegian public holidays for a given year
+function getNorwegianHolidays(year: number): CalendarDate[] {
+  const easter = calculateEaster(year);
+  
+  const holidays: CalendarDate[] = [
+    // Fixed holidays
+    { year, month: monthName(1), day: 1 },   // New Year's Day
+    { year, month: monthName(5), day: 1 },   // Labor Day
+    { year, month: monthName(5), day: 17 },  // Constitution Day
+    { year, month: monthName(12), day: 25 }, // Christmas Day
+    { year, month: monthName(12), day: 26 }, // Boxing Day
+    
+    // Easter-based holidays
+    addDays(easter, -3), // Maundy Thursday (Skjærtorsdag)
+    addDays(easter, -2), // Good Friday (Langfredag)
+    addDays(easter, 1),  // Easter Monday (2. påskedag)
+    addDays(easter, 39), // Ascension Day (Kristi himmelfartsdag)
+    addDays(easter, 50), // Whit Monday (2. pinsedag)
+  ];
+  
+  return holidays;
+}
+
+// Check if a date is a Norwegian public holiday (including Sundays)
+function isNorwegianHoliday(date: CalendarDate, holidays: CalendarDate[]): boolean {
+  // Sunday is always a public holiday
+  if (dayOfWeek(date) === 0) return true;
+  
+  // Check if date matches any of the specific holidays
+  return holidays.some(holiday => datesEqual(date, holiday));
+}
 
 export default function Home() {
   const [year, setYear] = useLocalStorage<number>('selectedYear', () => new Date().getFullYear());
@@ -216,20 +268,24 @@ export default function Home() {
     };
   }, [yearlyIncomeDisplay, displayHoursPerDay, daysTakenByType]);
 
-  // Calculate actual work days in the year (excluding weekends)
+  // Calculate actual work days in the year (excluding weekends and Norwegian holidays)
   const actualWorkDays = useMemo(() => {
+    const holidays = getNorwegianHolidays(displayYear);
     let workDayCount = 0;
 
-    for (let month = 0; month < 12; month++) {
-      const daysInMonth = new Date(displayYear, month + 1, 0).getDate();
+    for (let monthNum = 1; monthNum <= 12; monthNum++) {
+      const daysInMonth = new Date(displayYear, monthNum, 0).getDate();
 
       for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(displayYear, month, day);
-        const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+        const calendarDate: CalendarDate = { year: displayYear, month: monthName(monthNum), day };
+        const weekDay = dayOfWeek(calendarDate);
 
-        // Count Monday (1) through Friday (5) as work days
-        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-          workDayCount++;
+        // Count Monday through Friday as potential work days
+        if (weekDay !== 'sat' && weekDay !== 'sun') {
+          // But exclude Norwegian public holidays
+          if (!isNorwegianHoliday(calendarDate, holidays)) {
+            workDayCount++;
+          }
         }
       }
     }
@@ -447,19 +503,23 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 min-h-[800px]">
             {isCalendarReady && (
               <div className="contents animate-fadeIn">
-                {months.map((month, index) => (
-                  <Month
-                    key={`${displayYear}-${index}`}
-                    month={month}
-                    getDayStatus={getDayStatus}
-                    updateDayStatus={updateDayStatus}
-                    startDrag={startDrag}
-                    dragAction={dragAction}
-                    endDrag={endDrag}
-                    handleDragOver={handleDragOver}
-                    selectionMode={selectionMode}
-                  />
-                ))}
+                {months.map((month, index) => {
+                  const holidays = getNorwegianHolidays(displayYear);
+                  return (
+                    <Month
+                      key={`${displayYear}-${index}`}
+                      month={month}
+                      getDayStatus={getDayStatus}
+                      updateDayStatus={updateDayStatus}
+                      startDrag={startDrag}
+                      dragAction={dragAction}
+                      endDrag={endDrag}
+                      handleDragOver={handleDragOver}
+                      selectionMode={selectionMode}
+                      isHoliday={(date) => isNorwegianHoliday(date, holidays)}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
