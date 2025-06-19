@@ -476,7 +476,7 @@ export default function Home() {
 
         {/* Calendar Grid */}
         <div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 min-h-[800px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-1">
             {isCalendarReady && (
               <div className="contents animate-fadeIn">
                 {months.map((month, index) => {
@@ -502,13 +502,13 @@ export default function Home() {
         </div>
 
         {/* Elegant divider */}
-        <div className="mt-8 mb-8 flex justify-center">
+        <div className="mt-1 mb-8 flex justify-center">
           <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
         </div>
 
         {/* Calculation section */}
-        <div className="grid md:grid-cols-2 gap-8 text-center md:text-left">
-          <div>
+        <div className="grid md:grid-cols-2 gap-4 text-center md:text-left">
+          <div className="pl-4">
             <p className="text-lg leading-relaxed text-opacity-90" style={{ color: 'var(--text-primary)' }}>
               Det er vanlig å regne 260 arbeidsdager per år, som med din arbeidsuke gir{' '}
               {displayHoursPerDay && (
@@ -671,44 +671,50 @@ export default function Home() {
                           Endre beregning (avansert)
                         </summary>
                         <div className="mt-4 space-y-3">
-                          <div className="space-y-2">
-                            <label className="flex items-start space-x-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="calculationMethod"
-                                value="standard"
-                                checked={calculationMethod === 'standard'}
-                                onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy')}
-                                className="mt-1"
-                              />
+                          <div className="space-y-3">
+                            <label className="flex items-start space-x-3 cursor-pointer">
+                              <div className="custom-radio">
+                                <input
+                                  type="radio"
+                                  name="calculationMethod"
+                                  value="standard"
+                                  checked={calculationMethod === 'standard'}
+                                  onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy')}
+                                />
+                                <div className="custom-radio-circle"></div>
+                              </div>
                               <span className="text-sm">
                                 Arbeidsgiveren min betaler meg 1/12 av lønnen 11 ganger + {displayVacationPay.toString().replace('.', ',')}% feriepenger
                               </span>
                             </label>
                             
-                            <label className="flex items-start space-x-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="calculationMethod"
-                                value="generous"
-                                checked={calculationMethod === 'generous'}
-                                onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy')}
-                                className="mt-1"
-                              />
+                            <label className="flex items-start space-x-3 cursor-pointer">
+                              <div className="custom-radio">
+                                <input
+                                  type="radio"
+                                  name="calculationMethod"
+                                  value="generous"
+                                  checked={calculationMethod === 'generous'}
+                                  onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy')}
+                                />
+                                <div className="custom-radio-circle"></div>
+                              </div>
                               <span className="text-sm">
                                 Arbeidsgiveren min er snill og betaler meg 1/11 av lønnen 11 ganger (altså hele den nominelle lønnen) + {displayVacationPay.toString().replace('.', ',')}% feriepenger
                               </span>
                             </label>
                             
-                            <label className="flex items-start space-x-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="calculationMethod"
-                                value="stingy"
-                                checked={calculationMethod === 'stingy'}
-                                onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy')}
-                                className="mt-1"
-                              />
+                            <label className="flex items-start space-x-3 cursor-pointer">
+                              <div className="custom-radio">
+                                <input
+                                  type="radio"
+                                  name="calculationMethod"
+                                  value="stingy"
+                                  checked={calculationMethod === 'stingy'}
+                                  onChange={(e) => setCalculationMethod(e.target.value as 'standard' | 'generous' | 'stingy')}
+                                />
+                                <div className="custom-radio-circle"></div>
+                              </div>
                               <span className="text-sm">
                                 Arbeidsgiveren min er kjip og trekker meg for all ferien jeg tar
                               </span>
@@ -733,27 +739,26 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="text-center mt-8">
-          <span
-            onClick={() => {
-              // Reset global form fields
-              setYearlyIncomeDisplay('');
-              setVacationPay(null);
-              setVacationPayDisplay('');
-              setHoursPerDay(null);
-              setHoursPerDayDisplay('');
-
-              // Clear current year's day states
-              setDayStatesObj({});
-            }}
-            className="text-sm text-red-600 dark:text-red-400 hover:underline cursor-pointer"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            tilbakestill dette skjemaet
-          </span>
-        </div>
-
         <footer className="mt-12 text-center">
+          <div className="mb-8">
+            <span
+              onClick={() => {
+                // Reset global form fields
+                setYearlyIncomeDisplay('');
+                setVacationPay(null);
+                setVacationPayDisplay('');
+                setHoursPerDay(null);
+                setHoursPerDayDisplay('');
+
+                // Clear current year's day states
+                setDayStatesObj({});
+              }}
+              className="text-sm text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              tilbakestill dette skjemaet
+            </span>
+          </div>
           <p
             className="text-sm italic mb-4"
             style={{ color: 'var(--text-secondary)' }}
