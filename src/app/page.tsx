@@ -13,8 +13,8 @@ export default function Home() {
   const [isHydrated, setIsHydrated] = useState(false);
 
   const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useLocalStorage<string>('yearlyIncome', '');
-  const [vacationPay, setVacationPay] = useLocalStorage<number>('vacationPay');
-  const [hoursPerDay, setHoursPerDay] = useLocalStorage<number>('hoursPerDay');
+  const [vacationPay, setVacationPay] = useLocalStorage<number | null>('vacationPay', null);
+  const [hoursPerDay, setHoursPerDay] = useLocalStorage<number | null>('hoursPerDay', null);
 
   // Track hydration to avoid mismatch
   useEffect(() => {
@@ -23,6 +23,10 @@ export default function Home() {
 
   // Use current year for server rendering to avoid hydration mismatch
   const displayYear = isHydrated ? year : new Date().getFullYear();
+  
+  // Use null for server rendering to avoid hydration mismatch with number inputs
+  const displayVacationPay = isHydrated ? vacationPay : null;
+  const displayHoursPerDay = isHydrated ? hoursPerDay : null;
   
   // Defer year changes to avoid blocking UI
   const deferredYear = useDeferredValue(displayYear);
@@ -232,8 +236,8 @@ export default function Home() {
               Jeg har{' '}
               <input
                 type="number"
-                value={vacationPay?.toString() || ''}
-                onChange={(e) => setVacationPay(e.target.value ? Number(e.target.value) : undefined)}
+                value={displayVacationPay || ''}
+                onChange={(e) => setVacationPay(e.target.value ? Number(e.target.value) : null)}
                 placeholder="12"
                 className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
                 style={{
@@ -254,8 +258,8 @@ export default function Home() {
               Jeg jobber{' '}
               <input
                 type="number"
-                value={hoursPerDay?.toString() || ''}
-                onChange={(e) => setHoursPerDay(e.target.value ? Number(e.target.value) : undefined)}
+                value={displayHoursPerDay || ''}
+                onChange={(e) => setHoursPerDay(e.target.value ? Number(e.target.value) : null)}
                 placeholder="7.5"
               className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
               style={{
@@ -269,9 +273,9 @@ export default function Home() {
               step="0.1"
               />
               {' '}timer per dag
-              {hoursPerDay ? (
-                <span className="opacity-50 animate-fadeIn"> (for en {hoursPerDay * 5} timer arbeidsuke)</span>
-              ) : '\u00A0'}
+              {displayHoursPerDay && (
+                <span className="opacity-50"> (for en {displayHoursPerDay * 5} timer arbeidsuke)</span>
+              )}
               .
             </p>
           </div>
@@ -372,8 +376,8 @@ export default function Home() {
             onClick={() => {
               // Reset global form fields
               setYearlyIncomeDisplay('');
-              setVacationPay(undefined);
-              setHoursPerDay(undefined);
+              setVacationPay(null);
+              setHoursPerDay(null);
               
               // Clear current year's day states
               setDayStatesObj({});
