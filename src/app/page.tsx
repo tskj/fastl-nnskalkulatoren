@@ -14,6 +14,7 @@ export default function Home() {
 
   const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useLocalStorage<string>('yearlyIncome', '');
   const [vacationPay, setVacationPay] = useLocalStorage<number | null>('vacationPay', null);
+  const [vacationPayDisplay, setVacationPayDisplay] = useLocalStorage<string>('vacationPayDisplay', '');
   const [hoursPerDay, setHoursPerDay] = useLocalStorage<number | null>('hoursPerDay', null);
   const [hoursPerDayDisplay, setHoursPerDayDisplay] = useLocalStorage<string>('hoursPerDayDisplay', '');
 
@@ -27,6 +28,7 @@ export default function Home() {
   
   // Use null for server rendering to avoid hydration mismatch with number inputs
   const displayVacationPay = isHydrated ? vacationPay : null;
+  const displayVacationPayText = isHydrated ? vacationPayDisplay : '';
   const displayHoursPerDay = isHydrated ? hoursPerDay : null;
   const displayHoursPerDayText = isHydrated ? hoursPerDayDisplay : '';
   
@@ -346,9 +348,22 @@ export default function Home() {
             <p style={{ color: 'var(--text-primary)' }}>
               Jeg får{' '}
               <input
-                type="number"
-                value={displayVacationPay || ''}
-                onChange={(e) => setVacationPay(e.target.value ? Number(e.target.value) : null)}
+                type="text"
+                value={displayVacationPayText}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setVacationPayDisplay(value);
+                  
+                  if (value === '') {
+                    setVacationPay(null);
+                  } else {
+                    const normalizedValue = value.replace(',', '.');
+                    const numValue = parseFloat(normalizedValue);
+                    if (!isNaN(numValue) && numValue >= 0) {
+                      setVacationPay(numValue);
+                    }
+                  }
+                }}
                 placeholder="12"
                 className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
                 style={{
@@ -481,6 +496,7 @@ export default function Home() {
                 .
               </p>
             )}
+            
           </div>
           
           {/* Vertical divider - hidden on mobile */}
@@ -488,7 +504,7 @@ export default function Home() {
           
           <div>
             <p className="text-lg leading-relaxed" style={{ color: 'var(--text-primary)' }}>
-              I {displayYear} er det egentlig{' '}
+              I {displayYear} er det faktisk{' '}
               <span className="font-medium">
                 {actualWorkDays.toLocaleString('nb-NO')} arbeidsdager
               </span>
@@ -503,11 +519,10 @@ export default function Home() {
                   <span className="font-medium">
                     {(actualWorkDays * displayHoursPerDay).toLocaleString('nb-NO').replace(/\./g, ',')} arbeidstimer
                   </span>
-                  {' '}{(() => {
+                  {' '}som {(() => {
                     const currentYear = new Date().getFullYear();
                     if (displayYear < currentYear) return 'du jobbet';
-                    if (displayYear > currentYear) return 'du kommer til å jobbe';
-                    return 'du jobber';
+                    return 'du kommer til å jobbe';
                   })()}
                 </span>
               )}
@@ -542,29 +557,45 @@ export default function Home() {
               </div>
             )}
 
-            {yearlyIncomeDisplay && displayHoursPerDay && (daysTakenByType.ferie > 0 || daysTakenByType.permisjon_uten_lonn > 0) && (
+            {yearlyIncomeDisplay && displayHoursPerDay && displayVacationPay && (daysTakenByType.ferie > 0 || daysTakenByType.permisjon_uten_lonn > 0) && (
               <div className="mt-6">
                 <p className="text-lg leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                   {(() => {
                     const actualHoursWorked = (actualWorkDays - daysTakenByType.ferie - daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay;
-                    const yearlySalary = parseFloat(yearlyIncomeDisplay.replace(/\s/g, '')) || 0;
-                    const actualHourlyRate = actualHoursWorked > 0 ? yearlySalary / actualHoursWorked : 0;
+                    const nominalSalary = parseFloat(yearlyIncomeDisplay.replace(/\s/g, '')) || 0;
+                    
+                    // Actual earnings: 11/12 of nominal salary + vacation pay percentage
+                    const actualEarnings = (nominalSalary * 11/12) + (nominalSalary * (displayVacationPay/100));
+                    const actualHourlyRate = actualHoursWorked > 0 ? actualEarnings / actualHoursWorked : 0;
                     
                     const currentYear = new Date().getFullYear();
-                    const workVerb = displayYear < currentYear ? 'jobbet' : 
-                                   displayYear > currentYear ? 'kommer til å jobbe' : 'jobber';
                     
                     return (
                       <>
-                        Du {workVerb} egentlig{' '}
+                        {displayYear < currentYear ? 'Du jobbet egentlig' : 'Du kommer egentlig til å jobbe'}{' '}
                         <span className="font-medium">
                           {actualHoursWorked.toLocaleString('nb-NO').replace(/\./g, ',')} timer
+                        </span>
+                        .
+                        <br /><br />
+                        Din faktiske årslønn blir{' '}
+                        <span className="font-medium">
+                          {Math.round(actualEarnings).toLocaleString('nb-NO')} kroner
                         </span>
                         , som gir deg en faktisk timelønn på{' '}
                         <span className="font-medium">
                           {Math.round(actualHourlyRate).toLocaleString('nb-NO')} kroner per time
                         </span>
                         .
+                        <br /><br />
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-sm opacity-70 hover:opacity-100">
+                            Vis beregning
+                          </summary>
+                          <p className="text-sm mt-2 opacity-70">
+                            Faktisk årslønn = 11/12 av nominell lønn + {displayVacationPay.toString().replace('.', ',')}% feriepenger
+                          </p>
+                        </details>
                       </>
                     );
                   })()}
@@ -580,6 +611,7 @@ export default function Home() {
               // Reset global form fields
               setYearlyIncomeDisplay('');
               setVacationPay(null);
+              setVacationPayDisplay('');
               setHoursPerDay(null);
               setHoursPerDayDisplay('');
               
