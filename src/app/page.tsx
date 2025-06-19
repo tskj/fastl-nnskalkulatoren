@@ -477,6 +477,11 @@ export default function Home() {
               )}
             </span>
             .
+            <div className="h-6 mt-2">
+              {selectionMode === 'permisjon_med_lonn' && (
+                <span className="block text-sm opacity-60 transition-opacity duration-200"> (betalt permisjon påvirker ikke utbetalingen, men gir høyere timelønn)</span>
+              )}
+            </div>
           </div>
         </div>
 
