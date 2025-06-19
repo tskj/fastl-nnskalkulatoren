@@ -557,7 +557,7 @@ export default function Home() {
               </div>
             )}
 
-            {yearlyIncomeDisplay && displayHoursPerDay && displayVacationPay && (daysTakenByType.ferie > 0 || daysTakenByType.permisjon_uten_lonn > 0) && (
+            {yearlyIncomeDisplay && displayHoursPerDay && displayVacationPay && (
               <div className="mt-6">
                 {(() => {
                   const actualHoursWorked = (actualWorkDays - daysTakenByType.ferie - daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay;
@@ -568,6 +568,7 @@ export default function Home() {
                   const actualHourlyRate = actualHoursWorked > 0 ? actualEarnings / actualHoursWorked : 0;
                   
                   const currentYear = new Date().getFullYear();
+                  const hasVacationOrUnpaid = daysTakenByType.ferie > 0 || daysTakenByType.permisjon_uten_lonn > 0;
                   
                   return (
                     <>
@@ -576,6 +577,9 @@ export default function Home() {
                         <span className="font-medium text-opacity-100">
                           {actualHoursWorked.toLocaleString('nb-NO').replace(/\./g, ',')} timer
                         </span>
+                        {!hasVacationOrUnpaid && (
+                          <span className="font-medium text-blue-600 dark:text-blue-400"> (du tok ingen ferie)</span>
+                        )}
                         .
                       </p>
                       <p className="text-lg leading-relaxed mt-4 text-opacity-90" style={{ color: 'var(--text-primary)' }}>
