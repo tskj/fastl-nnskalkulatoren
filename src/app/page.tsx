@@ -118,12 +118,12 @@ export default function Home() {
       }, 300); // Match CSS transition duration
       
       return () => clearTimeout(timer);
-    } else if (!isCalendarReady) {
-      // Initial render
+    } else if (isHydrated && !isCalendarReady) {
+      // Initial render after hydration
       const timer = setTimeout(() => setIsCalendarReady(true), 100);
       return () => clearTimeout(timer);
     }
-  }, [displayYear, calendarKey, isCalendarReady]);
+  }, [displayYear, calendarKey, isCalendarReady, isHydrated]);
 
   // Current selection mode for drag operations
   const [selectionMode, setSelectionMode] = useState<DayStatus>('ferie');
@@ -539,7 +539,7 @@ export default function Home() {
 
         {/* Calendar Grid with fixed height and smooth transitions */}
         <div 
-          className="calendar-container min-h-[1000px] lg:min-h-[800px] xl:min-h-[600px]"
+          className="calendar-container relative"
           onMouseMove={(e) => {
             if (isDragging) {
               // Find the day element under the mouse
@@ -558,8 +558,33 @@ export default function Home() {
           <div className={`
             grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-1
             transition-all duration-300 ease-in-out
-            ${isCalendarReady ? 'opacity-100' : 'opacity-0'}
+            ${(isHydrated && isCalendarReady) ? 'opacity-100' : 'opacity-0'}
           `}>
+            {/* Always show some content to maintain layout - exact Month structure */}
+            {!isHydrated && Array.from({ length: 12 }, (_, i) => (
+              <div key={`placeholder-${i}`} className="p-4">
+                {/* Month header - matches Month.tsx exactly */}
+                <div className="text-center mb-4">
+                  <h3 className="font-medium text-lg capitalize opacity-0">
+                    månednavn
+                  </h3>
+                </div>
+
+                {/* Calendar grid - exactly 6 rows always (42 cells) */}
+                <div className="grid grid-cols-7 calendar-grid">
+                  {Array.from({ length: 42 }, (_, j) => (
+                    <div
+                      key={j}
+                      className="calendar-day flex items-center justify-center text-sm opacity-0"
+                    >
+                      {j > 2 && j < 33 ? j - 2 : ''}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Real calendar - show during transitions to maintain content for fade-out */}
             {isHydrated && months.map((month, index) => (
               <Month
                 key={`${calendarKey}-${index}`}
@@ -587,16 +612,17 @@ export default function Home() {
           <div>
             <p className="text-lg leading-relaxed text-opacity-90" style={{ color: 'var(--text-primary)' }}>
               Det er vanlig å regne 260 arbeidsdager per år, som med din arbeidsuke gir{' '}
-              {displayHoursPerDay && (
+              {isHydrated && displayHoursPerDay && (
                 <span className="font-medium text-opacity-100">
                   {(displayHoursPerDay * 5 * 52).toLocaleString('nb-NO').replace(/\./g, ',')} timer per år
                 </span>
               )}
-              {!displayHoursPerDay && <span className="text-opacity-50">0 timer per år</span>}
+              {isHydrated && !displayHoursPerDay && <span className="text-opacity-50">0 timer per år</span>}
+              {!isHydrated && <span className="text-opacity-50">... timer per år</span>}
               .
             </p>
 
-            {yearlyIncomeDisplay && displayHoursPerDay && (
+            {isHydrated && yearlyIncomeDisplay && displayHoursPerDay && (
               <p className="text-lg leading-relaxed mt-4 text-opacity-90" style={{ color: 'var(--text-primary)' }}>
                 Din nominelle timelønn er{' '}
                 <span className="font-medium text-opacity-100">
@@ -616,11 +642,11 @@ export default function Home() {
 
           <div className="pl-8">
             <p className="text-lg leading-relaxed text-opacity-90" style={{ color: 'var(--text-primary)' }}>
-              I {displayYear} er det faktisk{' '}
+              I {isHydrated ? displayYear : new Date().getFullYear()} er det faktisk{' '}
               <span className="font-medium text-opacity-100">
-                {actualWorkDays.toLocaleString('nb-NO')} arbeidsdager
+                {isHydrated ? actualWorkDays.toLocaleString('nb-NO') : '...'} arbeidsdager
               </span>
-              {displayHoursPerDay && (
+              {isHydrated && displayHoursPerDay && (
                 <span>
                   {' '}som {(() => {
                     const currentYear = new Date().getFullYear();
@@ -636,37 +662,42 @@ export default function Home() {
               .
             </p>
 
-            {(daysTakenByType.ferie > 0 || daysTakenByType.permisjon_med_lonn > 0 || daysTakenByType.permisjon_uten_lonn > 0) && (
-              <div className="mt-4 space-y-2">
-                {daysTakenByType.ferie > 0 && (
-                  <p className="text-base" style={{ color: 'var(--text-primary)' }}>
-                    <span className="font-medium text-blue-600 dark:text-blue-400">
-                      {daysTakenByType.ferie} dager ferie
-                    </span>
-                  </p>
-                )}
+            {/* Reserve space for vacation days display */}
+            <div className="mt-4 space-y-2 min-h-[4rem]">
+              {isHydrated && (daysTakenByType.ferie > 0 || daysTakenByType.permisjon_med_lonn > 0 || daysTakenByType.permisjon_uten_lonn > 0) && (
+                <>
+                  {daysTakenByType.ferie > 0 && (
+                    <p className="text-base" style={{ color: 'var(--text-primary)' }}>
+                      <span className="font-medium text-blue-600 dark:text-blue-400">
+                        {daysTakenByType.ferie} dager ferie
+                      </span>
+                    </p>
+                  )}
 
-                {daysTakenByType.permisjon_med_lonn > 0 && (
-                  <p className="text-base" style={{ color: 'var(--text-primary)' }}>
-                    <span className="font-medium text-green-600 dark:text-green-400">
-                      {daysTakenByType.permisjon_med_lonn} dager betalt permisjon
-                    </span>
-                  </p>
-                )}
+                  {daysTakenByType.permisjon_med_lonn > 0 && (
+                    <p className="text-base" style={{ color: 'var(--text-primary)' }}>
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        {daysTakenByType.permisjon_med_lonn} dager betalt permisjon
+                      </span>
+                    </p>
+                  )}
 
-                {daysTakenByType.permisjon_uten_lonn > 0 && (
-                  <p className="text-base" style={{ color: 'var(--text-primary)' }}>
-                    <span className="font-medium text-orange-600 dark:text-orange-400">
-                      {daysTakenByType.permisjon_uten_lonn} dager fri uten lønn
-                    </span>
-                  </p>
-                )}
-              </div>
-            )}
+                  {daysTakenByType.permisjon_uten_lonn > 0 && (
+                    <p className="text-base" style={{ color: 'var(--text-primary)' }}>
+                      <span className="font-medium text-orange-600 dark:text-orange-400">
+                        {daysTakenByType.permisjon_uten_lonn} dager fri uten lønn
+                      </span>
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
 
-            {yearlyIncomeDisplay && displayHoursPerDay && displayVacationPay && (
-              <div className="mt-6">
-                {(() => {
+            {/* Reserve space for salary calculations */}
+            <div className="mt-6 min-h-[8rem]">
+              {isHydrated && yearlyIncomeDisplay && displayHoursPerDay && displayVacationPay && (
+                <>
+                  {(() => {
                   const actualHoursWorked = (actualWorkDays - daysTakenByType.ferie - daysTakenByType.permisjon_med_lonn - daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay;
                   const nominalSalary = parseFloat(yearlyIncomeDisplay.replace(/\s/g, '')) || 0;
                   const nominalHourlyRate = nominalSalary / (displayHoursPerDay * 5 * 52);
@@ -826,9 +857,10 @@ export default function Home() {
                       </details>
                     </>
                   );
-                })()}
-              </div>
-            )}
+                  })()}
+                </>
+              )}
+            </div>
           </div>
         </div>
 

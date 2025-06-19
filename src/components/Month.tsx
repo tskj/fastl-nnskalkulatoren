@@ -87,15 +87,17 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
         </h3>
       </div>
 
-      {/* Calendar grid */}
+      {/* Calendar grid - always exactly 6 rows (42 cells) */}
       <div className="grid grid-cols-7 calendar-grid">
-        {/* Empty cells for days before month starts */}
-        {Array.from({ length: startPosition }, (_, i) => (
-          <div key={`empty-${i}`} className="calendar-day"></div>
-        ))}
-
-        {/* Days of the month */}
-        {days.map((day) => {
+        {Array.from({ length: 42 }, (_, cellIndex) => {
+          const dayIndex = cellIndex - startPosition;
+          const isValidDay = dayIndex >= 0 && dayIndex < daysInMonth;
+          
+          if (!isValidDay) {
+            return <div key={`empty-${cellIndex}`} className="calendar-day"></div>;
+          }
+          
+          const day = days[dayIndex];
           const dayWeekDay = dayOfWeek(day);
           const isWeekend = dayWeekDay === 'sat' || dayWeekDay === 'sun';
           const isSunday = dayWeekDay === 'sun';
