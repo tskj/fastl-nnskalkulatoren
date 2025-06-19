@@ -508,7 +508,7 @@ export default function Home() {
 
         {/* Calculation section */}
         <div className="grid md:grid-cols-2 gap-4 text-center md:text-left">
-          <div className="pl-4">
+          <div>
             <p className="text-lg leading-relaxed text-opacity-90" style={{ color: 'var(--text-primary)' }}>
               Det er vanlig å regne 260 arbeidsdager per år, som med din arbeidsuke gir{' '}
               {displayHoursPerDay && (
@@ -538,7 +538,7 @@ export default function Home() {
           {/* Vertical divider - hidden on mobile */}
           <div className="hidden md:block absolute left-1/2 w-px h-20 bg-gradient-to-b from-transparent via-gray-300 dark:via-gray-600 to-transparent transform -translate-x-1/2"></div>
 
-          <div>
+          <div className="pl-8">
             <p className="text-lg leading-relaxed text-opacity-90" style={{ color: 'var(--text-primary)' }}>
               I {displayYear} er det faktisk{' '}
               <span className="font-medium text-opacity-100">
