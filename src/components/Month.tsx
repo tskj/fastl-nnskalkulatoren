@@ -11,16 +11,10 @@ import type { DayStatus } from '@/app/page';
 interface MonthProps {
   month: CalendarMonth;
   getDayStatus: (year: number, month: string, day: number) => DayStatus;
-  updateDayStatus: (year: number, month: string, day: number, status: DayStatus) => void;
-  startDrag: (action: 'add' | 'remove') => void;
-  endDrag: () => void;
-  handleDragOver: (year: number, month: string, day: number) => void;
-  selectionMode: DayStatus;
-  dragAction: 'add' | 'remove';
   isHoliday: (date: CalendarDate) => boolean;
 }
 
-function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handleDragOver, selectionMode, isHoliday }: MonthProps) {
+function Month({ month, getDayStatus, isHoliday }: MonthProps) {
   // Get month name and year
   const monthNames = [
     'januar', 'februar', 'mars', 'april', 'mai', 'juni',
@@ -29,34 +23,6 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
   const monthIndex = monthNumber(month.month) - 1;
   const monthName = monthNames[monthIndex];
 
-  // Handle mouse down on day (start drag and select current day)
-  const handleMouseDown = (day: CalendarDate) => {
-    const currentStatus = getDayStatus(day.year, day.month, day.day);
-    
-    // Determine action based on current state
-    let action: 'add' | 'remove';
-    if (currentStatus === selectionMode) {
-      // If clicking on a day with the same status as selection mode, start removing
-      updateDayStatus(day.year, day.month, day.day, null);
-      action = 'remove';
-    } else {
-      // Otherwise, start adding
-      updateDayStatus(day.year, day.month, day.day, selectionMode);
-      action = 'add';
-    }
-    
-    startDrag(action);
-  };
-
-  // Handle mouse enter on day (select if dragging)
-  const handleMouseEnter = (day: CalendarDate) => {
-    handleDragOver(day.year, day.month, day.day);
-  };
-
-  // Handle mouse over for more responsive dragging
-  const handleMouseOver = (day: CalendarDate) => {
-    handleDragOver(day.year, day.month, day.day);
-  };
 
   // Get number of days in this month
   const daysInMonth = numberOfDaysInMonth(month);
@@ -206,10 +172,6 @@ function Month({ month, getDayStatus, updateDayStatus, startDrag, endDrag, handl
                 }
               `}
               style={statusStyle.style}
-              onMouseDown={() => !isWeekend && !isNorwegianHoliday && handleMouseDown(day)}
-              onMouseEnter={() => !isWeekend && !isNorwegianHoliday && handleMouseEnter(day)}
-              onMouseOver={() => !isWeekend && !isNorwegianHoliday && handleMouseOver(day)}
-              onMouseUp={endDrag}
             >
               {day.day}
             </div>

@@ -127,8 +127,11 @@ export default function Home() {
 
   // Current selection mode for drag operations
   const [selectionMode, setSelectionMode] = useState<DayStatus>('ferie');
+  
+  // Simple drag state
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragAction, setDragAction] = useState<'add' | 'remove'>('add');
+  const draggedDaysRef = useRef<Set<string>>(new Set());
   const [calculationMethod, setCalculationMethod] = useLocalStorage<'standard' | 'generous' | 'stingy' | 'anal'>('calculationMethod', 'standard');
 
   // Helper to create day key
@@ -139,15 +142,20 @@ export default function Home() {
   // Update day status
   const updateDayStatus = (year: number, month: string, day: number, status: DayStatus) => {
     const key = getDayKey(year, month, day);
-    setDayStates(prev => {
-      const newMap = new Map(prev);
-      if (status === null) {
-        newMap.delete(key);
-      } else {
-        newMap.set(key, status);
-      }
-      return newMap;
-    });
+    const currentStatus = dayStates.get(key) || null;
+    
+    // Only update if the status is actually changing
+    if (currentStatus !== status) {
+      setDayStates(prev => {
+        const newMap = new Map(prev);
+        if (status === null) {
+          newMap.delete(key);
+        } else {
+          newMap.set(key, status);
+        }
+        return newMap;
+      });
+    }
   };
 
   // Get day status
@@ -156,41 +164,41 @@ export default function Home() {
     return dayStates.get(key) || null;
   };
 
-  // Start drag operation
-  const startDrag = (action: 'add' | 'remove') => {
-    lastProcessedDayRef.current = ''; // Clear last processed day
-    setIsDragging(true);
-    setDragAction(action);
-  };
 
-  // End drag operation
-  const endDrag = () => {
-    setIsDragging(false);
-  };
-
-  // Track last processed day to avoid redundant updates
-  const lastProcessedDayRef = useRef<string>('');
-
-  // Handle drag over day (select/deselect day during drag)
-  const handleDragOver = (year: number, month: string, day: number) => {
-    if (!isDragging) return;
-    
-    const dayKey = getDayKey(year, month, day);
-    
-    // Skip if we just processed this day
-    if (lastProcessedDayRef.current === dayKey) return;
-    lastProcessedDayRef.current = dayKey;
-    
+  // Simple drag over handler
+  const handleDayInteraction = (year: number, month: string, day: number) => {
     // Check if it's a holiday or weekend - don't process those
     const date: CalendarDate = { year, month, day };
     if (isHolidayChecker(date) || dayOfWeek(date) === 'sat' || dayOfWeek(date) === 'sun') {
       return;
     }
+
+    const dayKey = getDayKey(year, month, day);
     
-    if (dragAction === 'add') {
-      updateDayStatus(year, month, day, selectionMode);
+    if (isDragging) {
+      // During drag, only process if not already done
+      if (draggedDaysRef.current.has(dayKey)) return;
+      draggedDaysRef.current.add(dayKey);
+      
+      if (dragAction === 'add') {
+        updateDayStatus(year, month, day, selectionMode);
+      } else {
+        updateDayStatus(year, month, day, null);
+      }
     } else {
-      updateDayStatus(year, month, day, null);
+      // Click to toggle
+      const currentStatus = getDayStatus(year, month, day);
+      if (currentStatus === selectionMode) {
+        updateDayStatus(year, month, day, null);
+        setDragAction('remove');
+      } else {
+        updateDayStatus(year, month, day, selectionMode);
+        setDragAction('add');
+      }
+      
+      // Start drag
+      setIsDragging(true);
+      draggedDaysRef.current = new Set([dayKey]);
     }
   };
 
@@ -309,17 +317,18 @@ export default function Home() {
   }, [displayYear]);
 
 
-  // Global mouse up handler to end drag anywhere
+  // Simple global mouseup handler
   useEffect(() => {
-    const handleGlobalMouseUp = () => {
+    const handleMouseUp = () => {
       if (isDragging) {
         setIsDragging(false);
+        draggedDaysRef.current = new Set(); // Clear for next drag
       }
     };
 
     if (isDragging) {
-      document.addEventListener('mouseup', handleGlobalMouseUp);
-      return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => document.removeEventListener('mouseup', handleMouseUp);
     }
   }, [isDragging]);
 
@@ -355,8 +364,6 @@ export default function Home() {
     <div
       className="min-h-screen px-8 py-16"
       style={{ background: 'var(--background)' }}
-      onMouseUp={endDrag}
-      onMouseLeave={endDrag}
     >
       <div className="max-w-4xl mx-auto">
         <header className="mb-16 text-center">
@@ -540,16 +547,24 @@ export default function Home() {
         {/* Calendar Grid with fixed height and smooth transitions */}
         <div 
           className="calendar-container relative"
-          onMouseMove={(e) => {
+          onMouseDown={(e) => {
+            const dayElement = (e.target as Element).closest('.calendar-day');
+            if (dayElement) {
+              const dayKey = dayElement.getAttribute('data-day-key');
+              if (dayKey) {
+                const [year, month, day] = dayKey.split('-');
+                handleDayInteraction(parseInt(year), month, parseInt(day));
+              }
+            }
+          }}
+          onMouseOver={(e) => {
             if (isDragging) {
-              // Find the day element under the mouse
-              const element = document.elementFromPoint(e.clientX, e.clientY);
-              if (element && element.closest('.calendar-day')) {
-                const dayElement = element.closest('.calendar-day');
-                const dayKey = dayElement?.getAttribute('data-day-key');
+              const dayElement = (e.target as Element).closest('.calendar-day');
+              if (dayElement) {
+                const dayKey = dayElement.getAttribute('data-day-key');
                 if (dayKey) {
                   const [year, month, day] = dayKey.split('-');
-                  handleDragOver(parseInt(year), month, parseInt(day));
+                  handleDayInteraction(parseInt(year), month, parseInt(day));
                 }
               }
             }
@@ -590,12 +605,6 @@ export default function Home() {
                 key={`${calendarKey}-${index}`}
                 month={month}
                 getDayStatus={getDayStatus}
-                updateDayStatus={updateDayStatus}
-                startDrag={startDrag}
-                dragAction={dragAction}
-                endDrag={endDrag}
-                handleDragOver={handleDragOver}
-                selectionMode={selectionMode}
                 isHoliday={isHolidayChecker}
               />
             ))}
