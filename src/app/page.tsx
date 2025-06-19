@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useDeferredValue, useMemo, useEffect, useRef, useCallback } from 'react';
-import { CalendarMonth, monthName, CalendarDate, addDays, dayOfWeek, datesEqual } from 'typescript-calendar-date';
+import { CalendarMonth, monthName, CalendarDate, addDays, dayOfWeek, datesEqual, monthNumber } from 'typescript-calendar-date';
 import Month from '@/components/Month';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
@@ -128,10 +128,14 @@ export default function Home() {
   // Current selection mode for drag operations
   const [selectionMode, setSelectionMode] = useState<DayStatus>('ferie');
   
-  // Simple drag state
+  // High-performance drag state with mathematical intersection detection
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragAction, setDragAction] = useState<'add' | 'remove'>('add');
   const draggedDaysRef = useRef<Set<string>>(new Set());
+  const lastMousePosRef = useRef<{x: number, y: number} | null>(null);
+  const dragStartInfoRef = useRef<{monthIndex: number, dayBox: {row: number, col: number}, relativePos: {x: number, y: number}} | null>(null);
+  const touchedDaysSetRef = useRef<Set<string>>(new Set());
+  const touchedDaysCountRef = useRef<number>(0);
   const [calculationMethod, setCalculationMethod] = useLocalStorage<'standard' | 'generous' | 'stingy' | 'anal'>('calculationMethod', 'standard');
 
   // Helper to create day key
@@ -165,8 +169,152 @@ export default function Home() {
   };
 
 
-  // Simple drag over handler
-  const handleDayInteraction = (year: number, month: string, day: number) => {
+  // Mathematical helper functions for line intersection
+  const getDayBoxFromCoordinates = (x: number, y: number, monthIndex: number) => {
+    const monthElement = document.querySelector(`[data-month-index="${monthIndex}"]`);
+    if (!monthElement) return null;
+    
+    const calendarGrid = monthElement.querySelector('.calendar-grid');
+    if (!calendarGrid) return null;
+    
+    const gridRect = calendarGrid.getBoundingClientRect();
+    const relativeX = x - gridRect.left;
+    const relativeY = y - gridRect.top;
+    
+    const cellWidth = gridRect.width / 7;
+    const cellHeight = gridRect.height / 6;
+    
+    const col = Math.floor(relativeX / cellWidth);
+    const row = Math.floor(relativeY / cellHeight);
+    
+    if (col >= 0 && col < 7 && row >= 0 && row < 6) {
+      const cellIndex = row * 7 + col;
+      const cellCenterX = gridRect.left + (col + 0.5) * cellWidth;
+      const cellCenterY = gridRect.top + (row + 0.5) * cellHeight;
+      
+      return {
+        row,
+        col,
+        cellIndex,
+        centerX: cellCenterX,
+        centerY: cellCenterY,
+        relativeX: relativeX - col * cellWidth,
+        relativeY: relativeY - row * cellHeight
+      };
+    }
+    return null;
+  };
+  
+  const getDayFromCellIndex = (cellIndex: number, monthIndex: number) => {
+    const month = months[monthIndex];
+    if (!month) return null;
+    
+    const daysInMonth = new Date(month.year, monthNumber(month.month), 0).getDate();
+    const firstDayOfWeek = dayOfWeek({ year: month.year, month: month.month, day: 1 });
+    const weekDayMap = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5, sun: 6 };
+    const startPosition = weekDayMap[firstDayOfWeek];
+    
+    const dayIndex = cellIndex - startPosition;
+    if (dayIndex >= 0 && dayIndex < daysInMonth) {
+      return {
+        year: month.year,
+        month: month.month,
+        day: dayIndex + 1
+      };
+    }
+    return null;
+  };
+  
+  const getLineIntersectedCells = (x1: number, y1: number, x2: number, y2: number, monthIndex: number) => {
+    const monthElement = document.querySelector(`[data-month-index="${monthIndex}"]`);
+    if (!monthElement) return [];
+    
+    const calendarGrid = monthElement.querySelector('.calendar-grid');
+    if (!calendarGrid) return [];
+    
+    const gridRect = calendarGrid.getBoundingClientRect();
+    const cellWidth = gridRect.width / 7;
+    const cellHeight = gridRect.height / 6;
+    
+    // Convert to grid coordinates
+    const gx1 = (x1 - gridRect.left) / cellWidth;
+    const gy1 = (y1 - gridRect.top) / cellHeight;
+    const gx2 = (x2 - gridRect.left) / cellWidth;
+    const gy2 = (y2 - gridRect.top) / cellHeight;
+    
+    const intersectedCells = new Set<number>();
+    
+    // Bresenham-like algorithm for grid traversal
+    const dx = Math.abs(gx2 - gx1);
+    const dy = Math.abs(gy2 - gy1);
+    const stepX = gx1 < gx2 ? 1 : -1;
+    const stepY = gy1 < gy2 ? 1 : -1;
+    
+    let x = Math.floor(gx1);
+    let y = Math.floor(gy1);
+    const endX = Math.floor(gx2);
+    const endY = Math.floor(gy2);
+    
+    let error = dx - dy;
+    
+    while (true) {
+      // Add current cell if within bounds
+      if (x >= 0 && x < 7 && y >= 0 && y < 6) {
+        intersectedCells.add(y * 7 + x);
+      }
+      
+      if (x === endX && y === endY) break;
+      
+      const error2 = error * 2;
+      if (error2 > -dy) {
+        error -= dy;
+        x += stepX;
+      }
+      if (error2 < dx) {
+        error += dx;
+        y += stepY;
+      }
+    }
+    
+    return Array.from(intersectedCells);
+  };
+  
+  const processTouchedDays = (cellIndices: number[], monthIndex: number) => {
+    let hasNewDays = false;
+    
+    cellIndices.forEach(cellIndex => {
+      const dayInfo = getDayFromCellIndex(cellIndex, monthIndex);
+      if (!dayInfo) return;
+      
+      // Check if it's a holiday or weekend - don't process those
+      const date: CalendarDate = { year: dayInfo.year, month: dayInfo.month, day: dayInfo.day };
+      if (isHolidayChecker(date) || dayOfWeek(date) === 'sat' || dayOfWeek(date) === 'sun') {
+        return;
+      }
+      
+      const dayKey = getDayKey(dayInfo.year, dayInfo.month, dayInfo.day);
+      
+      if (!touchedDaysSetRef.current.has(dayKey)) {
+        touchedDaysSetRef.current.add(dayKey);
+        hasNewDays = true;
+        
+        if (dragAction === 'add') {
+          updateDayStatus(dayInfo.year, dayInfo.month, dayInfo.day, selectionMode);
+        } else {
+          updateDayStatus(dayInfo.year, dayInfo.month, dayInfo.day, null);
+        }
+      }
+    });
+    
+    // Only trigger re-render if we found new days
+    if (hasNewDays) {
+      touchedDaysCountRef.current = touchedDaysSetRef.current.size;
+    }
+  };
+  
+  
+  // Simple drag over handler (legacy fallback)
+  const handleDayInteraction = (year: number, month: string, day: number, monthIndex?: number) => {
     // Check if it's a holiday or weekend - don't process those
     const date: CalendarDate = { year, month, day };
     if (isHolidayChecker(date) || dayOfWeek(date) === 'sat' || dayOfWeek(date) === 'sun') {
@@ -177,8 +325,8 @@ export default function Home() {
     
     if (isDragging) {
       // During drag, only process if not already done
-      if (draggedDaysRef.current.has(dayKey)) return;
-      draggedDaysRef.current.add(dayKey);
+      if (touchedDaysSetRef.current.has(dayKey)) return;
+      touchedDaysSetRef.current.add(dayKey);
       
       if (dragAction === 'add') {
         updateDayStatus(year, month, day, selectionMode);
@@ -196,9 +344,44 @@ export default function Home() {
         setDragAction('add');
       }
       
-      // Start drag
+      // Start drag with high-performance tracking
+      if (typeof monthIndex === 'number') {
+        const monthElement = document.querySelector(`[data-month-index="${monthIndex}"]`);
+        if (monthElement) {
+          const calendarGrid = monthElement.querySelector('.calendar-grid');
+          if (calendarGrid) {
+            const gridRect = calendarGrid.getBoundingClientRect();
+            const cellWidth = gridRect.width / 7;
+            const cellHeight = gridRect.height / 6;
+            
+            // Find which cell this day corresponds to
+            const daysInMonth = new Date(year, monthNumber(month), 0).getDate();
+            const firstDayOfWeek = dayOfWeek({ year, month, day: 1 });
+            const weekDayMap = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5, sun: 6 };
+            const startPosition = weekDayMap[firstDayOfWeek];
+            const cellIndex = startPosition + (day - 1);
+            const row = Math.floor(cellIndex / 7);
+            const col = cellIndex % 7;
+            
+            dragStartInfoRef.current = {
+              monthIndex,
+              dayBox: { row, col },
+              relativePos: { x: cellWidth / 2, y: cellHeight / 2 }
+            };
+          }
+        }
+      }
+      
       setIsDragging(true);
+      touchedDaysSetRef.current = new Set([dayKey]);
+      touchedDaysCountRef.current = 1;
       draggedDaysRef.current = new Set([dayKey]);
+      
+      // Set initial mouse position for line intersection calculation
+      lastMousePosRef.current = { x: 0, y: 0 };
+      
+      // Add the global mouse move listener
+      document.addEventListener('mousemove', handleCalendarMouseMove, { passive: true });
     }
   };
 
@@ -252,6 +435,27 @@ export default function Home() {
   
   // Memoize holiday checker function
   const isHolidayChecker = useCallback((date: CalendarDate) => isNorwegianHoliday(date, holidays), [holidays]);
+  
+  // High-performance mouse move handler for drag operations
+  const handleCalendarMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging || !lastMousePosRef.current || !dragStartInfoRef.current) return;
+    
+    const currentPos = { x: e.clientX, y: e.clientY };
+    const lastPos = lastMousePosRef.current;
+    
+    // Get all cells intersected by the line from last position to current position
+    const intersectedCells = getLineIntersectedCells(
+      lastPos.x, lastPos.y,
+      currentPos.x, currentPos.y,
+      dragStartInfoRef.current.monthIndex
+    );
+    
+    if (intersectedCells.length > 0) {
+      processTouchedDays(intersectedCells, dragStartInfoRef.current.monthIndex);
+    }
+    
+    lastMousePosRef.current = currentPos;
+  }, [isDragging, dragAction, selectionMode, isHolidayChecker]);
   
   // Generate all 12 months for the selected year (memoized to avoid recalculation)
   const months: CalendarMonth[] = useMemo(() =>
@@ -317,20 +521,30 @@ export default function Home() {
   }, [displayYear]);
 
 
-  // Simple global mouseup handler
+  // High-performance global mouseup handler
   useEffect(() => {
     const handleMouseUp = () => {
       if (isDragging) {
         setIsDragging(false);
-        draggedDaysRef.current = new Set(); // Clear for next drag
+        draggedDaysRef.current = new Set();
+        touchedDaysSetRef.current = new Set();
+        touchedDaysCountRef.current = 0;
+        lastMousePosRef.current = null;
+        dragStartInfoRef.current = null;
+        
+        // Remove the global mouse move listener
+        document.removeEventListener('mousemove', handleCalendarMouseMove);
       }
     };
 
     if (isDragging) {
       document.addEventListener('mouseup', handleMouseUp);
-      return () => document.removeEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('mousemove', handleCalendarMouseMove);
+      };
     }
-  }, [isDragging]);
+  }, [isDragging, handleCalendarMouseMove]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -544,27 +758,38 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Calendar Grid with fixed height and smooth transitions */}
+        {/* Calendar Grid with high-performance drag system */}
         <div 
           className="calendar-container relative"
           onMouseDown={(e) => {
             const dayElement = (e.target as Element).closest('.calendar-day');
             if (dayElement) {
               const dayKey = dayElement.getAttribute('data-day-key');
+              const monthElement = dayElement.closest('[data-month-index]');
+              const monthIndex = monthElement ? parseInt(monthElement.getAttribute('data-month-index') || '0') : 0;
+              
               if (dayKey) {
                 const [year, month, day] = dayKey.split('-');
-                handleDayInteraction(parseInt(year), month, parseInt(day));
+                
+                // Set initial mouse position for accurate line intersection
+                lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+                
+                handleDayInteraction(parseInt(year), month, parseInt(day), monthIndex);
               }
             }
           }}
           onMouseOver={(e) => {
+            // Legacy fallback for browsers that might miss mousemove events
             if (isDragging) {
               const dayElement = (e.target as Element).closest('.calendar-day');
               if (dayElement) {
                 const dayKey = dayElement.getAttribute('data-day-key');
+                const monthElement = dayElement.closest('[data-month-index]');
+                const monthIndex = monthElement ? parseInt(monthElement.getAttribute('data-month-index') || '0') : 0;
+                
                 if (dayKey) {
                   const [year, month, day] = dayKey.split('-');
-                  handleDayInteraction(parseInt(year), month, parseInt(day));
+                  handleDayInteraction(parseInt(year), month, parseInt(day), monthIndex);
                 }
               }
             }
@@ -599,14 +824,15 @@ export default function Home() {
               </div>
             ))}
 
-            {/* Real calendar - show during transitions to maintain content for fade-out */}
+            {/* Real calendar with month indices for high-performance drag */}
             {isHydrated && months.map((month, index) => (
-              <Month
-                key={`${calendarKey}-${index}`}
-                month={month}
-                getDayStatus={getDayStatus}
-                isHoliday={isHolidayChecker}
-              />
+              <div key={`${calendarKey}-${index}`} data-month-index={index}>
+                <Month
+                  month={month}
+                  getDayStatus={getDayStatus}
+                  isHoliday={isHolidayChecker}
+                />
+              </div>
             ))}
           </div>
         </div>
