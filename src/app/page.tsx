@@ -95,12 +95,10 @@ export default function Home() {
   // Convert to Map for easier usage
   const dayStates = useMemo(() => new Map(Object.entries(dayStatesObj)), [dayStatesObj]);
   const setDayStates = useCallback((updateFn: (prev: Map<string, DayStatus>) => Map<string, DayStatus>) => {
-    setDayStatesObj(((prevObj: Record<string, DayStatus>) => {
-      const prevMap = new Map(Object.entries(prevObj));
-      const newMap = updateFn(prevMap);
-      return Object.fromEntries(newMap.entries());
-    }) as any as Record<string, DayStatus>);
-  }, [setDayStatesObj]);
+    const prevMap = new Map(Object.entries(dayStatesObj));
+    const newMap = updateFn(prevMap);
+    setDayStatesObj(Object.fromEntries(newMap.entries()));
+  }, [dayStatesObj, setDayStatesObj]);
 
   // Calendar fade in/out animation with proper sequencing
   const [calendarKey, setCalendarKey] = useState(displayYear);
@@ -233,7 +231,7 @@ export default function Home() {
   // Simple drag over handler (legacy fallback)
   const handleDayInteraction = (year: number, month: string, day: number, monthIndex?: number) => {
     // Check if it's a holiday or weekend - don't process those
-    const date: CalendarDate = { year, month, day };
+    const date: CalendarDate = { year, month: month as ReturnType<typeof monthName>, day };
     if (isHolidayChecker(date) || dayOfWeek(date) === 'sat' || dayOfWeek(date) === 'sun') {
       return;
     }
@@ -272,7 +270,7 @@ export default function Home() {
             const cellHeight = gridRect.height / 6;
             
             // Find which cell this day corresponds to
-            const firstDayOfWeek = dayOfWeek({ year, month, day: 1 });
+            const firstDayOfWeek = dayOfWeek({ year, month: month as ReturnType<typeof monthName>, day: 1 });
             const weekDayMap = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5, sun: 6 };
             const startPosition = weekDayMap[firstDayOfWeek];
             const cellIndex = startPosition + (day - 1);
