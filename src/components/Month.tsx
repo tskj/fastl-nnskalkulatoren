@@ -129,6 +129,18 @@ function Month({ month, getDayStatus, isHoliday }: MonthProps) {
                 bgColor = 'bg-orange-200 dark:bg-orange-800';
                 textColor = (isNorwegianHoliday || isSunday) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-orange-900 dark:text-orange-100';
                 break;
+              case 'foreldrepermisjon':
+                bgColor = 'bg-purple-200 dark:bg-purple-800';
+                textColor = (isNorwegianHoliday || isSunday) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-purple-900 dark:text-purple-100';
+                break;
+              case 'foreldrepermisjon_80':
+                bgColor = 'bg-pink-200 dark:bg-pink-800';
+                textColor = (isNorwegianHoliday || isSunday) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-pink-900 dark:text-pink-100';
+                break;
+              case 'sykemelding':
+                bgColor = 'bg-red-200 dark:bg-red-800';
+                textColor = (isNorwegianHoliday || isSunday) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-red-900 dark:text-red-100';
+                break;
             }
 
             // Build rounded corners based on connections - each corner independently

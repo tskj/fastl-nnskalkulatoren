@@ -9,8 +9,8 @@ const ebGaramond = EB_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "Fastlønnskalkulator",
-  description: "Beregn raskt din lønn basert på timelønn og arbeidstid",
+  title: "Feriepengekalulator",
+  description: "Beregn feriepengar og faktisk årslønn for deg som har fastlønn",
   other: {
     'darkreader-lock': ''
   }

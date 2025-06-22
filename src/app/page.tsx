@@ -5,7 +5,62 @@ import { CalendarMonth, monthName, CalendarDate, addDays, dayOfWeek, datesEqual 
 import Month from '@/components/Month';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
-export type DayStatus = 'ferie' | 'permisjon_med_lonn' | 'permisjon_uten_lonn' | null;
+export type DayStatus = 'ferie' | 'permisjon_med_lonn' | 'permisjon_uten_lonn' | 'foreldrepermisjon' | 'foreldrepermisjon_80' | 'sykemelding' | null;
+
+// Norwegian social security base amount (grunnbeløp) historical data and estimation
+const GRUNNBELOP_HISTORICAL: Record<number, number> = {
+  2020: 101351,
+  2021: 106399,
+  2022: 111477,
+  2023: 118620,
+  2024: 124028,
+  2025: 130160,
+};
+
+// Calculate average yearly growth rate from historical data
+const calculateAverageGrowthRate = (): number => {
+  const years = Object.keys(GRUNNBELOP_HISTORICAL).map(Number).sort();
+  const growthRates: number[] = [];
+  
+  for (let i = 1; i < years.length; i++) {
+    const prevYear = years[i - 1];
+    const currentYear = years[i];
+    const growthRate = (GRUNNBELOP_HISTORICAL[currentYear] - GRUNNBELOP_HISTORICAL[prevYear]) / GRUNNBELOP_HISTORICAL[prevYear];
+    growthRates.push(growthRate);
+  }
+  
+  return growthRates.reduce((sum, rate) => sum + rate, 0) / growthRates.length;
+};
+
+// Get grunnbeløp for a specific year (historical or estimated)
+const getGrunnbelopForYear = (year: number): number => {
+  // Return historical value if available
+  if (GRUNNBELOP_HISTORICAL[year]) {
+    return GRUNNBELOP_HISTORICAL[year];
+  }
+  
+  // Estimate for future years based on average growth rate
+  const lastKnownYear = Math.max(...Object.keys(GRUNNBELOP_HISTORICAL).map(Number));
+  const lastKnownValue = GRUNNBELOP_HISTORICAL[lastKnownYear];
+  const averageGrowthRate = calculateAverageGrowthRate();
+  const yearsToProject = year - lastKnownYear;
+  
+  if (yearsToProject > 0) {
+    // Project forward using compound growth
+    return Math.round(lastKnownValue * Math.pow(1 + averageGrowthRate, yearsToProject));
+  } else {
+    // For years before our historical data, use backwards projection
+    const firstKnownYear = Math.min(...Object.keys(GRUNNBELOP_HISTORICAL).map(Number));
+    const firstKnownValue = GRUNNBELOP_HISTORICAL[firstKnownYear];
+    const yearsToBackProject = firstKnownYear - year;
+    return Math.round(firstKnownValue / Math.pow(1 + averageGrowthRate, yearsToBackProject));
+  }
+};
+
+// Get 6G for a specific year
+const get6GForYear = (year: number): number => {
+  return 6 * getGrunnbelopForYear(year);
+};
 
 // Calculate Easter Sunday for a given year using the anonymous Gregorian algorithm
 function calculateEaster(year: number): CalendarDate {
@@ -69,6 +124,13 @@ export default function Home() {
   const [vacationPayDisplay, setVacationPayDisplay] = useLocalStorage<string>('vacationPayDisplay', '12');
   const [hoursPerDay, setHoursPerDay] = useLocalStorage<number>('hoursPerDay', 7.5);
   const [hoursPerDayDisplay, setHoursPerDayDisplay] = useLocalStorage<string>('hoursPerDayDisplay', '7,5');
+  
+  // Foreldrepermisjon settings
+  const [employerCoversAbove6G, setEmployerCoversAbove6G] = useLocalStorage<boolean>('employerCoversAbove6G', false);
+  
+  // Sykemelding settings
+  const [employerCoversSykeAbove6G, setEmployerCoversSykeAbove6G] = useLocalStorage<boolean>('employerCoversSykeAbove6G', false);
+  const [employerPaysVacationOnNavSick, setEmployerPaysVacationOnNavSick] = useLocalStorage<boolean>('employerPaysVacationOnNavSick', false);
 
   // Track hydration to avoid mismatch
   useEffect(() => {
@@ -309,6 +371,12 @@ export default function Home() {
         return 'betalt permisjon';
       case 'permisjon_uten_lonn':
         return 'fri uten lønn';
+      case 'foreldrepermisjon':
+        return 'foreldrepermisjon (100%)';
+      case 'foreldrepermisjon_80':
+        return 'foreldrepermisjon (80%)';
+      case 'sykemelding':
+        return 'sykemelding';
       default:
         return 'ferie';
     }
@@ -323,6 +391,12 @@ export default function Home() {
         return 'text-green-600 dark:text-green-400';
       case 'permisjon_uten_lonn':
         return 'text-orange-600 dark:text-orange-400';
+      case 'foreldrepermisjon':
+        return 'text-purple-600 dark:text-purple-400';
+      case 'foreldrepermisjon_80':
+        return 'text-pink-600 dark:text-pink-400';
+      case 'sykemelding':
+        return 'text-red-600 dark:text-red-400';
       default:
         return 'text-blue-600 dark:text-blue-400';
     }
@@ -332,12 +406,21 @@ export default function Home() {
   const cycleSelectionMode = () => {
     switch (selectionMode) {
       case 'ferie':
+        setSelectionMode('foreldrepermisjon');
+        break;
+      case 'foreldrepermisjon':
+        setSelectionMode('foreldrepermisjon_80');
+        break;
+      case 'foreldrepermisjon_80':
         setSelectionMode('permisjon_med_lonn');
         break;
       case 'permisjon_med_lonn':
         setSelectionMode('permisjon_uten_lonn');
         break;
       case 'permisjon_uten_lonn':
+        setSelectionMode('sykemelding');
+        break;
+      case 'sykemelding':
         setSelectionMode('ferie');
         break;
       default:
@@ -448,14 +531,20 @@ export default function Home() {
       return {
         ferie: 0,
         permisjon_med_lonn: 0,
-        permisjon_uten_lonn: 0
+        permisjon_uten_lonn: 0,
+        foreldrepermisjon: 0,
+        foreldrepermisjon_80: 0,
+        sykemelding: 0
       };
     }
 
     const counts = {
       ferie: 0,
       permisjon_med_lonn: 0,
-      permisjon_uten_lonn: 0
+      permisjon_uten_lonn: 0,
+      foreldrepermisjon: 0,
+      foreldrepermisjon_80: 0,
+      sykemelding: 0
     };
 
     for (const [, status] of dayStates) {
@@ -544,6 +633,34 @@ export default function Home() {
     const value = e.target.value;
     const formatted = formatNumber(value);
     setYearlyIncomeDisplay(formatted);
+  };
+
+  // Auto-fill vacation days
+  const fillVacationWeeks = (weeks: number) => {
+    const daysToMark = weeks * 5; // 5 work days per week
+    let markedDays = 0;
+    const newDayStates = new Map(dayStates);
+    
+    // Iterate through months and mark weekdays as vacation
+    for (let monthNum = 1; monthNum <= 12 && markedDays < daysToMark; monthNum++) {
+      const daysInMonth = new Date(displayYear, monthNum, 0).getDate();
+      
+      for (let day = 1; day <= daysInMonth && markedDays < daysToMark; day++) {
+        const calendarDate: CalendarDate = { year: displayYear, month: monthName(monthNum), day };
+        const weekDay = dayOfWeek(calendarDate);
+        const dayKey = getDayKey(displayYear, monthName(monthNum), day);
+        
+        // Only mark weekdays that aren't holidays and aren't already marked
+        if (weekDay !== 'sat' && weekDay !== 'sun' && 
+            !isHolidayChecker(calendarDate) && 
+            !newDayStates.has(dayKey)) {
+          newDayStates.set(dayKey, 'ferie');
+          markedDays++;
+        }
+      }
+    }
+    
+    setDayStatesObj(Object.fromEntries(newDayStates.entries()));
   };
 
   return (
@@ -724,13 +841,36 @@ export default function Home() {
               )}
             </span>
             .
-            <div className="h-6 mt-2">
+            <div className="min-h-[1.5rem] mt-2">
               {selectionMode === 'permisjon_med_lonn' && (
                 <span className="block text-sm opacity-60 transition-opacity duration-200"> (betalt permisjon påvirker ikke utbetalingen, men gir høyere timelønn)</span>
+              )}
+              {(selectionMode === 'foreldrepermisjon' || selectionMode === 'foreldrepermisjon_80') && (
+                <span className="block text-sm opacity-60 transition-opacity duration-200"> (Nav dekker opp til 6G, se avansert innstilling dersom din arbeidsgiver dekker mellomlegg)</span>
+              )}
+              {isHydrated && selectionMode === 'ferie' && daysTakenByType.ferie === 0 && (
+                <span className="block text-sm opacity-60 transition-opacity duration-200">
+                  {' '}(fyll ut fellesferien med{' '}
+                  <button
+                    onClick={() => fillVacationWeeks(4)}
+                    className="underline hover:opacity-70 transition-opacity cursor-pointer bg-transparent border-0 p-0 text-blue-500 dark:text-blue-300 opacity-80"
+                  >
+                    4 uker
+                  </button>
+                  {' '}eller{' '}
+                  <button
+                    onClick={() => fillVacationWeeks(5)}
+                    className="underline hover:opacity-70 transition-opacity cursor-pointer bg-transparent border-0 p-0 text-blue-500 dark:text-blue-300 opacity-80"
+                  >
+                    5 uker
+                  </button>
+                  )
+                </span>
               )}
             </div>
           </div>
         </div>
+
 
         {/* Calendar Grid with high-performance drag system */}
         <div 
@@ -811,6 +951,7 @@ export default function Home() {
           </div>
         </div>
 
+
         {/* Elegant divider */}
         <div className="mt-6 mb-8 flex justify-center">
           <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
@@ -872,7 +1013,7 @@ export default function Home() {
 
             {/* Reserve space for vacation days display */}
             <div className="mt-4 space-y-2 min-h-[4rem]">
-              {isHydrated && (daysTakenByType.ferie > 0 || daysTakenByType.permisjon_med_lonn > 0 || daysTakenByType.permisjon_uten_lonn > 0) && (
+              {isHydrated && (daysTakenByType.ferie > 0 || daysTakenByType.permisjon_med_lonn > 0 || daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0) && (
                 <>
                   {daysTakenByType.ferie > 0 && (
                     <p className="text-base" style={{ color: 'var(--text-primary)' }}>
@@ -897,6 +1038,30 @@ export default function Home() {
                       </span>
                     </p>
                   )}
+
+                  {daysTakenByType.foreldrepermisjon > 0 && (
+                    <p className="text-base" style={{ color: 'var(--text-primary)' }}>
+                      <span className="font-medium text-purple-600 dark:text-purple-400">
+                        {daysTakenByType.foreldrepermisjon} dager foreldrepermisjon (100%)
+                      </span>
+                    </p>
+                  )}
+
+                  {daysTakenByType.foreldrepermisjon_80 > 0 && (
+                    <p className="text-base" style={{ color: 'var(--text-primary)' }}>
+                      <span className="font-medium text-pink-600 dark:text-pink-400">
+                        {daysTakenByType.foreldrepermisjon_80} dager foreldrepermisjon (80%)
+                      </span>
+                    </p>
+                  )}
+
+                  {daysTakenByType.sykemelding > 0 && (
+                    <p className="text-base" style={{ color: 'var(--text-primary)' }}>
+                      <span className="font-medium text-red-600 dark:text-red-400">
+                        {daysTakenByType.sykemelding} dager sykemelding
+                      </span>
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -906,7 +1071,7 @@ export default function Home() {
               {isHydrated && displayYearlyIncomeText && displayHoursPerDay && displayVacationPay && (
                 <>
                   {(() => {
-                  const actualHoursWorked = (actualWorkDays - daysTakenByType.ferie - daysTakenByType.permisjon_med_lonn - daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay;
+                  const actualHoursWorked = (actualWorkDays - daysTakenByType.ferie - daysTakenByType.permisjon_med_lonn - daysTakenByType.permisjon_uten_lonn - daysTakenByType.foreldrepermisjon - daysTakenByType.foreldrepermisjon_80 - daysTakenByType.sykemelding) * displayHoursPerDay;
                   const nominalSalary = parseFloat(displayYearlyIncomeText.replace(/\s/g, '')) || 0;
                   const nominalHourlyRate = nominalSalary / (displayHoursPerDay * 5 * 52);
                   
@@ -917,50 +1082,133 @@ export default function Home() {
                   // Unpaid leave reduces the salary base for calculating vacation pay
                   const unpaidLeaveDeduction = daysTakenByType.permisjon_uten_lonn * displayHoursPerDay * nominalHourlyRate;
                   
+                  // Calculate foreldrepermisjon compensation
+                  const calculateForeldrepermisjonPay = () => {
+                    let totalForeldrePay = 0;
+                    let totalForeldreFromEmployer = 0;
+                    
+                    // Get 6G value for the selected year
+                    const sixGForYear = get6GForYear(displayYear);
+                    
+                    // Regular foreldrepermisjon (100%)
+                    if (daysTakenByType.foreldrepermisjon > 0) {
+                      const dailyRate = nominalHourlyRate * displayHoursPerDay;
+                      const navPaysUpTo6G = Math.min(nominalSalary, sixGForYear) / (actualWorkDays);
+                      const employerPaysAbove6G = employerCoversAbove6G ? Math.max(0, dailyRate - navPaysUpTo6G) : 0;
+                      
+                      totalForeldrePay += daysTakenByType.foreldrepermisjon * navPaysUpTo6G;
+                      totalForeldreFromEmployer += daysTakenByType.foreldrepermisjon * employerPaysAbove6G;
+                    }
+                    
+                    // 80% foreldrepermisjon (spread over 125% time, but same total amount)
+                    if (daysTakenByType.foreldrepermisjon_80 > 0) {
+                      const dailyRate = nominalHourlyRate * displayHoursPerDay;
+                      const navPaysUpTo6G = Math.min(nominalSalary, sixGForYear) / (actualWorkDays);
+                      const employerPaysAbove6G = employerCoversAbove6G ? Math.max(0, dailyRate - navPaysUpTo6G) : 0;
+                      
+                      // 80% gets same total Nav support, but additional unpaid days
+                      totalForeldrePay += daysTakenByType.foreldrepermisjon_80 * navPaysUpTo6G;
+                      totalForeldreFromEmployer += daysTakenByType.foreldrepermisjon_80 * employerPaysAbove6G;
+                    }
+                    
+                    return { navPay: totalForeldrePay, employerPay: totalForeldreFromEmployer };
+                  };
+                  
+                  const foreldreComp = calculateForeldrepermisjonPay();
+                  
+                  // Calculate sykemelding compensation (complex 48-day vacation pay limit)
+                  const calculateSykemeldingPay = () => {
+                    if (daysTakenByType.sykemelding === 0) {
+                      return { navPay: 0, navVacationPay: 0, employerPay: 0, employerVacationPay: 0 };
+                    }
+                    
+                    const sixGForYear = get6GForYear(displayYear);
+                    const dailyRate = nominalHourlyRate * displayHoursPerDay;
+                    const navDailyRate = Math.min(nominalSalary, sixGForYear) / actualWorkDays;
+                    const employerDailyRate = employerCoversSykeAbove6G ? Math.max(0, dailyRate - navDailyRate) : 0;
+                    
+                    // Nav pays all sick days up to 6G
+                    const navPay = daysTakenByType.sykemelding * navDailyRate;
+                    const employerPay = daysTakenByType.sykemelding * employerDailyRate;
+                    
+                    // Vacation pay logic: Nav only pays vacation on first 48 days
+                    const first48Days = Math.min(daysTakenByType.sykemelding, 48);
+                    const beyond48Days = Math.max(0, daysTakenByType.sykemelding - 48);
+                    
+                    // Nav vacation pay: only on first 48 days
+                    const navVacationPay = (first48Days * navDailyRate) * (displayVacationPay / 100);
+                    
+                    // Employer vacation pay calculation
+                    let employerVacationPay = 0;
+                    if (employerCoversSykeAbove6G) {
+                      // Employer always pays vacation on their portion (above 6G)
+                      employerVacationPay += (daysTakenByType.sykemelding * employerDailyRate) * (displayVacationPay / 100);
+                    }
+                    
+                    if (employerPaysVacationOnNavSick && beyond48Days > 0) {
+                      // If employer covers Nav portion vacation pay after 48 days
+                      employerVacationPay += (beyond48Days * navDailyRate) * (displayVacationPay / 100);
+                    }
+                    
+                    return { 
+                      navPay, 
+                      navVacationPay, 
+                      employerPay, 
+                      employerVacationPay 
+                    };
+                  };
+                  
+                  const sykeComp = calculateSykemeldingPay();
+                  
                   switch (calculationMethod) {
                     case 'standard':
                       const standardBase = (nominalSalary * 11/12) - unpaidLeaveDeduction;
-                      actualEarnings = standardBase + (standardBase * (displayVacationPay/100));
+                      const standardVacationBase = standardBase + foreldreComp.employerPay + sykeComp.employerPay;
+                      actualEarnings = standardVacationBase + (standardVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
                       calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 
-                        ? `faktisk årslønn = (11/12 av nominell lønn - fri uten lønn*) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
-                        : `faktisk årslønn = 11/12 av nominell lønn + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
+                        ? `faktisk årslønn = (11/12 av nominell lønn - fri uten lønn* + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
+                        : `faktisk årslønn = 11/12 av nominell lønn + foreldrepermisjon + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                       break;
                     case 'generous':
                       const generousBase = nominalSalary - unpaidLeaveDeduction;
-                      actualEarnings = generousBase + (generousBase * (displayVacationPay/100));
+                      const generousVacationBase = generousBase + foreldreComp.employerPay + sykeComp.employerPay;
+                      actualEarnings = generousVacationBase + (generousVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
                       calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0
-                        ? `faktisk årslønn = (full nominell lønn - fri uten lønn*) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
-                        : `faktisk årslønn = full nominell lønn + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
+                        ? `faktisk årslønn = (full nominell lønn - fri uten lønn* + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
+                        : `faktisk årslønn = full nominell lønn + foreldrepermisjon + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                       break;
                     case 'stingy':
                       const vacationDeduction = daysTakenByType.ferie * displayHoursPerDay * nominalHourlyRate;
                       const stingyBase = nominalSalary - vacationDeduction - unpaidLeaveDeduction;
-                      actualEarnings = stingyBase + (stingyBase * (displayVacationPay/100));
+                      const stingyVacationBase = stingyBase + foreldreComp.employerPay + sykeComp.employerPay;
+                      actualEarnings = stingyVacationBase + (stingyVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
                       calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0
-                        ? `faktisk årslønn = (nominell lønn - feriedager - fri uten lønn*) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
-                        : `faktisk årslønn = (nominell lønn - feriedager) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
+                        ? `faktisk årslønn = (nominell lønn - feriedager - fri uten lønn* + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
+                        : `faktisk årslønn = (nominell lønn - feriedager + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                       break;
                     case 'anal':
                       const realHourlyRate = nominalSalary / (actualWorkDays * displayHoursPerDay);
                       const allLeaveDeduction = (daysTakenByType.ferie + daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay * realHourlyRate;
                       const analBase = nominalSalary - allLeaveDeduction;
-                      actualEarnings = analBase + (analBase * (displayVacationPay/100));
+                      const analVacationBase = analBase + foreldreComp.employerPay + sykeComp.employerPay;
+                      actualEarnings = analVacationBase + (analVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
                       calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0
-                        ? `faktisk årslønn = (nominell lønn - alle fridager*) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`
-                        : `faktisk årslønn = (nominell lønn - feriedager) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`;
+                        ? `faktisk årslønn = (nominell lønn - alle fridager* + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`
+                        : `faktisk årslønn = (nominell lønn - feriedager + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`;
                       break;
                     default:
                       const defaultBase = (nominalSalary * 11/12) - unpaidLeaveDeduction;
-                      actualEarnings = defaultBase + (defaultBase * (displayVacationPay/100));
+                      const defaultVacationBase = defaultBase + foreldreComp.employerPay + sykeComp.employerPay;
+                      actualEarnings = defaultVacationBase + (defaultVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
                       calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0
-                        ? `faktisk årslønn = (11/12 av nominell lønn - fri uten lønn*) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
-                        : `faktisk årslønn = 11/12 av nominell lønn + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
+                        ? `faktisk årslønn = (11/12 av nominell lønn - fri uten lønn* + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
+                        : `faktisk årslønn = 11/12 av nominell lønn + foreldrepermisjon + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                   }
                   
                   const actualHourlyRate = actualHoursWorked > 0 ? actualEarnings / actualHoursWorked : 0;
 
                   const currentYear = new Date().getFullYear();
-                  const hasVacationOrUnpaid = daysTakenByType.ferie > 0 || daysTakenByType.permisjon_uten_lonn > 0;
+                  const hasVacationOrUnpaid = daysTakenByType.ferie > 0 || daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0;
 
                   return (
                     <>
@@ -1053,6 +1301,81 @@ export default function Home() {
                             </label>
                           </div>
                           
+                          {/* Employer coverage for foreldrepermisjon */}
+                          {(daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0) && (
+                            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                              <label className="flex items-start space-x-3 cursor-pointer">
+                                <div className="custom-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={employerCoversAbove6G}
+                                    onChange={(e) => setEmployerCoversAbove6G(e.target.checked)}
+                                    className="sr-only"
+                                  />
+                                  <div className={`w-4 h-4 border-2 rounded transition-colors ${employerCoversAbove6G ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'}`}>
+                                    {employerCoversAbove6G && (
+                                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                </div>
+                                <span className="text-sm">
+                                  Arbeidsgiveren min dekker lønn over 6G under foreldrepermisjon (bare arbeidsgiverens del gir feriepenger)
+                                </span>
+                              </label>
+                            </div>
+                          )}
+                          
+                          {/* Sykemelding employer coverage options */}
+                          {daysTakenByType.sykemelding > 0 && (
+                            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                              <label className="flex items-start space-x-3 cursor-pointer mb-3">
+                                <div className="custom-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={employerCoversSykeAbove6G}
+                                    onChange={(e) => setEmployerCoversSykeAbove6G(e.target.checked)}
+                                    className="sr-only"
+                                  />
+                                  <div className={`w-4 h-4 border-2 rounded transition-colors ${employerCoversSykeAbove6G ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'}`}>
+                                    {employerCoversSykeAbove6G && (
+                                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                </div>
+                                <span className="text-sm">
+                                  Arbeidsgiveren min dekker lønn over 6G under sykemelding (arbeidsgiverens del gir feriepenger, Nav gir feriepenger de første 48 dagene)
+                                </span>
+                              </label>
+                              
+                              {daysTakenByType.sykemelding > 48 && (
+                                <label className="flex items-start space-x-3 cursor-pointer">
+                                  <div className="custom-checkbox">
+                                    <input
+                                      type="checkbox"
+                                      checked={employerPaysVacationOnNavSick}
+                                      onChange={(e) => setEmployerPaysVacationOnNavSick(e.target.checked)}
+                                      className="sr-only"
+                                    />
+                                    <div className={`w-4 h-4 border-2 rounded transition-colors ${employerPaysVacationOnNavSick ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'}`}>
+                                      {employerPaysVacationOnNavSick && (
+                                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="text-sm">
+                                    Arbeidsgiveren min betaler feriepenger på Navs del etter 48 dager sykemelding totalt per år (utover vanlig Nav-regel)
+                                  </span>
+                                </label>
+                              )}
+                            </div>
+                          )}
+                          
                           <p className="text-xs mt-3 opacity-70 border-t pt-2">
                             {calculationExplanation}
                           </p>
@@ -1082,6 +1405,9 @@ export default function Home() {
                 setVacationPayDisplay('12');
                 setHoursPerDay(7.5);
                 setHoursPerDayDisplay('7,5');
+                setEmployerCoversAbove6G(false);
+                setEmployerCoversSykeAbove6G(false);
+                setEmployerPaysVacationOnNavSick(false);
 
                 // Clear current year's day states
                 setDayStatesObj({});
@@ -1096,7 +1422,7 @@ export default function Home() {
             className="text-sm italic mb-4"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Lønnskalkulatoren &nbsp;&nbsp;·&nbsp;&nbsp; laga med kjærleik og claude code
+            Feriepengekalkulatoren &nbsp;&nbsp;·&nbsp;&nbsp; laga med kjærleik og claude code
           </p>
         </footer>
       </div>
