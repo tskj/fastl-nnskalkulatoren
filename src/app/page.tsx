@@ -64,11 +64,11 @@ export default function Home() {
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState<boolean>(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useLocalStorage<string>('yearlyIncome', '');
-  const [vacationPay, setVacationPay] = useLocalStorage<number | null>('vacationPay', null);
-  const [vacationPayDisplay, setVacationPayDisplay] = useLocalStorage<string>('vacationPayDisplay', '');
-  const [hoursPerDay, setHoursPerDay] = useLocalStorage<number | null>('hoursPerDay', null);
-  const [hoursPerDayDisplay, setHoursPerDayDisplay] = useLocalStorage<string>('hoursPerDayDisplay', '');
+  const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useLocalStorage<string>('yearlyIncome', '600 000');
+  const [vacationPay, setVacationPay] = useLocalStorage<number>('vacationPay', 12);
+  const [vacationPayDisplay, setVacationPayDisplay] = useLocalStorage<string>('vacationPayDisplay', '12');
+  const [hoursPerDay, setHoursPerDay] = useLocalStorage<number>('hoursPerDay', 7.5);
+  const [hoursPerDayDisplay, setHoursPerDayDisplay] = useLocalStorage<string>('hoursPerDayDisplay', '7,5');
 
   // Track hydration to avoid mismatch
   useEffect(() => {
@@ -78,11 +78,12 @@ export default function Home() {
   // Use current year for server rendering to avoid hydration mismatch
   const displayYear = isHydrated ? year : new Date().getFullYear();
 
-  // Use null for server rendering to avoid hydration mismatch with number inputs
-  const displayVacationPay = isHydrated ? vacationPay : null;
-  const displayVacationPayText = isHydrated ? vacationPayDisplay : '';
-  const displayHoursPerDay = isHydrated ? hoursPerDay : null;
-  const displayHoursPerDayText = isHydrated ? hoursPerDayDisplay : '';
+  // Use default values for server rendering to avoid hydration mismatch
+  const displayVacationPay = isHydrated ? vacationPay : 12;
+  const displayVacationPayText = isHydrated ? vacationPayDisplay : '12';
+  const displayHoursPerDay = isHydrated ? hoursPerDay : 7.5;
+  const displayHoursPerDayText = isHydrated ? hoursPerDayDisplay : '7,5';
+  const displayYearlyIncomeText = isHydrated ? yearlyIncomeDisplay : '600 000';
 
 
   // Ref for dropdown click-outside detection
@@ -572,7 +573,7 @@ export default function Home() {
               Min nominelle årslønn er{' '}
               <input
                 type="text"
-                value={yearlyIncomeDisplay}
+                value={displayYearlyIncomeText}
                 onChange={handleYearlyIncomeChange}
                 className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
                 style={{
@@ -582,7 +583,6 @@ export default function Home() {
                   fontFamily: 'inherit',
                   width: '120px'
                 }}
-                placeholder="000 000"
               />
               {' '}kroner.
             </p>
@@ -599,7 +599,8 @@ export default function Home() {
                   setHoursPerDayDisplay(value);
 
                   if (value === '') {
-                    setHoursPerDay(null);
+                    setHoursPerDay(7.5);
+                    setHoursPerDayDisplay('7,5');
                   } else {
                     const normalizedValue = value.replace(',', '.');
                     const numValue = parseFloat(normalizedValue);
@@ -616,7 +617,6 @@ export default function Home() {
                   fontFamily: 'inherit',
                   width: '50px'
                 }}
-                placeholder="7,5"
                 step="0.1"
               />
               {' '}timer per dag
@@ -638,7 +638,8 @@ export default function Home() {
                   setVacationPayDisplay(value);
 
                   if (value === '') {
-                    setVacationPay(null);
+                    setVacationPay(12);
+                    setVacationPayDisplay('12');
                   } else {
                     const normalizedValue = value.replace(',', '.');
                     const numValue = parseFloat(normalizedValue);
@@ -655,7 +656,6 @@ export default function Home() {
                   fontFamily: 'inherit',
                   width: '40px'
                 }}
-                placeholder="12"
               />
               {' '}% i feriepenger.
             </p>
@@ -818,22 +818,20 @@ export default function Home() {
           <div>
             <p className="text-lg leading-relaxed text-opacity-90" style={{ color: 'var(--text-primary)' }}>
               Det er vanlig å regne 260 arbeidsdager per år, som med din arbeidsuke gir{' '}
-              {isHydrated && displayHoursPerDay && (
+              {displayHoursPerDay && (
                 <span className="font-medium text-opacity-100">
                   {(displayHoursPerDay * 5 * 52).toLocaleString('nb-NO').replace(/\./g, ',')} timer per år
                 </span>
               )}
-              {isHydrated && !displayHoursPerDay && <span className="text-opacity-50">0 timer per år</span>}
-              {!isHydrated && <span className="text-opacity-50">... timer per år</span>}
               .
             </p>
 
-            {isHydrated && yearlyIncomeDisplay && displayHoursPerDay && (
+            {displayYearlyIncomeText && displayHoursPerDay && (
               <p className="text-lg leading-relaxed mt-4 text-opacity-90" style={{ color: 'var(--text-primary)' }}>
                 Din nominelle timelønn er{' '}
                 <span className="font-medium text-opacity-100">
                   {Math.round(
-                    (parseFloat(yearlyIncomeDisplay.replace(/\s/g, '')) || 0) /
+                    (parseFloat(displayYearlyIncomeText.replace(/\s/g, '')) || 0) /
                     (displayHoursPerDay * 5 * 52)
                   ).toLocaleString('nb-NO')} kroner per time
                 </span>
@@ -901,11 +899,11 @@ export default function Home() {
 
             {/* Reserve space for salary calculations */}
             <div className="mt-6 min-h-[8rem]">
-              {isHydrated && yearlyIncomeDisplay && displayHoursPerDay && displayVacationPay && (
+              {displayYearlyIncomeText && displayHoursPerDay && displayVacationPay && (
                 <>
                   {(() => {
                   const actualHoursWorked = (actualWorkDays - daysTakenByType.ferie - daysTakenByType.permisjon_med_lonn - daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay;
-                  const nominalSalary = parseFloat(yearlyIncomeDisplay.replace(/\s/g, '')) || 0;
+                  const nominalSalary = parseFloat(displayYearlyIncomeText.replace(/\s/g, '')) || 0;
                   const nominalHourlyRate = nominalSalary / (displayHoursPerDay * 5 * 52);
                   
                   // Calculate actual earnings based on selected method
@@ -1074,12 +1072,12 @@ export default function Home() {
           <div className="mb-8">
             <span
               onClick={() => {
-                // Reset global form fields
-                setYearlyIncomeDisplay('');
-                setVacationPay(null);
-                setVacationPayDisplay('');
-                setHoursPerDay(null);
-                setHoursPerDayDisplay('');
+                // Reset global form fields to defaults
+                setYearlyIncomeDisplay('600 000');
+                setVacationPay(12);
+                setVacationPayDisplay('12');
+                setHoursPerDay(7.5);
+                setHoursPerDayDisplay('7,5');
 
                 // Clear current year's day states
                 setDayStatesObj({});
