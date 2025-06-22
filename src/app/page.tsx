@@ -1082,10 +1082,11 @@ export default function Home() {
                   // Unpaid leave reduces the salary base for calculating vacation pay
                   const unpaidLeaveDeduction = daysTakenByType.permisjon_uten_lonn * displayHoursPerDay * nominalHourlyRate;
                   
-                  // Calculate foreldrepermisjon compensation
+                  // Calculate foreldrepermisjon deduction/compensation
                   const calculateForeldrepermisjonPay = () => {
-                    let totalForeldrePay = 0;
-                    let totalForeldreFromEmployer = 0;
+                    let totalNavPay = 0;
+                    let totalEmployerPay = 0;
+                    let totalSalaryDeduction = 0;
                     
                     // Get 6G value for the selected year
                     const sixGForYear = get6GForYear(displayYear);
@@ -1093,33 +1094,42 @@ export default function Home() {
                     // Regular foreldrepermisjon (100%)
                     if (daysTakenByType.foreldrepermisjon > 0) {
                       const dailyRate = nominalHourlyRate * displayHoursPerDay;
-                      const navPaysUpTo6G = Math.min(nominalSalary, sixGForYear) / (actualWorkDays);
-                      const employerPaysAbove6G = employerCoversAbove6G ? Math.max(0, dailyRate - navPaysUpTo6G) : 0;
+                      const navDailyRate = Math.min(nominalSalary, sixGForYear) / actualWorkDays;
+                      const employerDailyRate = employerCoversAbove6G ? Math.max(0, dailyRate - navDailyRate) : 0;
                       
-                      totalForeldrePay += daysTakenByType.foreldrepermisjon * navPaysUpTo6G;
-                      totalForeldreFromEmployer += daysTakenByType.foreldrepermisjon * employerPaysAbove6G;
+                      // Total Nav payment (no vacation pay)
+                      totalNavPay += daysTakenByType.foreldrepermisjon * navDailyRate;
+                      // Total employer payment (gets vacation pay)
+                      totalEmployerPay += daysTakenByType.foreldrepermisjon * employerDailyRate;
+                      // Deduction from base salary (the days you don't get your full salary)
+                      totalSalaryDeduction += daysTakenByType.foreldrepermisjon * dailyRate;
                     }
                     
                     // 80% foreldrepermisjon (spread over 125% time, but same total amount)
                     if (daysTakenByType.foreldrepermisjon_80 > 0) {
                       const dailyRate = nominalHourlyRate * displayHoursPerDay;
-                      const navPaysUpTo6G = Math.min(nominalSalary, sixGForYear) / (actualWorkDays);
-                      const employerPaysAbove6G = employerCoversAbove6G ? Math.max(0, dailyRate - navPaysUpTo6G) : 0;
+                      const navDailyRate = Math.min(nominalSalary, sixGForYear) / actualWorkDays;
+                      const employerDailyRate = employerCoversAbove6G ? Math.max(0, dailyRate - navDailyRate) : 0;
                       
-                      // 80% gets same total Nav support, but additional unpaid days
-                      totalForeldrePay += daysTakenByType.foreldrepermisjon_80 * navPaysUpTo6G;
-                      totalForeldreFromEmployer += daysTakenByType.foreldrepermisjon_80 * employerPaysAbove6G;
+                      // 80% gets same Nav daily rate per day taken off
+                      totalNavPay += daysTakenByType.foreldrepermisjon_80 * navDailyRate;
+                      totalEmployerPay += daysTakenByType.foreldrepermisjon_80 * employerDailyRate;
+                      totalSalaryDeduction += daysTakenByType.foreldrepermisjon_80 * dailyRate;
                     }
                     
-                    return { navPay: totalForeldrePay, employerPay: totalForeldreFromEmployer };
+                    return { 
+                      navPay: totalNavPay, 
+                      employerPay: totalEmployerPay,
+                      salaryDeduction: totalSalaryDeduction
+                    };
                   };
                   
                   const foreldreComp = calculateForeldrepermisjonPay();
                   
-                  // Calculate sykemelding compensation (complex 48-day vacation pay limit)
+                  // Calculate sykemelding deduction/compensation (complex 48-day vacation pay limit)
                   const calculateSykemeldingPay = () => {
                     if (daysTakenByType.sykemelding === 0) {
-                      return { navPay: 0, navVacationPay: 0, employerPay: 0, employerVacationPay: 0 };
+                      return { navPay: 0, navVacationPay: 0, employerPay: 0, employerVacationPay: 0, salaryDeduction: 0 };
                     }
                     
                     const sixGForYear = get6GForYear(displayYear);
@@ -1130,6 +1140,9 @@ export default function Home() {
                     // Nav pays all sick days up to 6G
                     const navPay = daysTakenByType.sykemelding * navDailyRate;
                     const employerPay = daysTakenByType.sykemelding * employerDailyRate;
+                    
+                    // Deduction from base salary (the days you don't get your full salary)
+                    const salaryDeduction = daysTakenByType.sykemelding * dailyRate;
                     
                     // Vacation pay logic: Nav only pays vacation on first 48 days
                     const first48Days = Math.min(daysTakenByType.sykemelding, 48);
@@ -1154,7 +1167,8 @@ export default function Home() {
                       navPay, 
                       navVacationPay, 
                       employerPay, 
-                      employerVacationPay 
+                      employerVacationPay,
+                      salaryDeduction
                     };
                   };
                   
@@ -1162,47 +1176,47 @@ export default function Home() {
                   
                   switch (calculationMethod) {
                     case 'standard':
-                      const standardBase = (nominalSalary * 11/12) - unpaidLeaveDeduction;
+                      const standardBase = (nominalSalary * 11/12) - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeComp.salaryDeduction;
                       const standardVacationBase = standardBase + foreldreComp.employerPay + sykeComp.employerPay;
                       actualEarnings = standardVacationBase + (standardVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
-                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 
-                        ? `faktisk årslønn = (11/12 av nominell lønn - fri uten lønn* + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
-                        : `faktisk årslønn = 11/12 av nominell lønn + foreldrepermisjon + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
+                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0
+                        ? `faktisk årslønn = (11/12 av nominell lønn - reduksjoner* + arbeidsgiver-tillegg) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger + Nav-utbetalinger`
+                        : `faktisk årslønn = 11/12 av nominell lønn + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                       break;
                     case 'generous':
-                      const generousBase = nominalSalary - unpaidLeaveDeduction;
+                      const generousBase = nominalSalary - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeComp.salaryDeduction;
                       const generousVacationBase = generousBase + foreldreComp.employerPay + sykeComp.employerPay;
                       actualEarnings = generousVacationBase + (generousVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
-                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0
-                        ? `faktisk årslønn = (full nominell lønn - fri uten lønn* + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
-                        : `faktisk årslønn = full nominell lønn + foreldrepermisjon + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
+                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0
+                        ? `faktisk årslønn = (full nominell lønn - reduksjoner* + arbeidsgiver-tillegg) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger + Nav-utbetalinger`
+                        : `faktisk årslønn = full nominell lønn + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                       break;
                     case 'stingy':
                       const vacationDeduction = daysTakenByType.ferie * displayHoursPerDay * nominalHourlyRate;
-                      const stingyBase = nominalSalary - vacationDeduction - unpaidLeaveDeduction;
+                      const stingyBase = nominalSalary - vacationDeduction - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeComp.salaryDeduction;
                       const stingyVacationBase = stingyBase + foreldreComp.employerPay + sykeComp.employerPay;
                       actualEarnings = stingyVacationBase + (stingyVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
-                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0
-                        ? `faktisk årslønn = (nominell lønn - feriedager - fri uten lønn* + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
-                        : `faktisk årslønn = (nominell lønn - feriedager + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
+                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0
+                        ? `faktisk årslønn = (nominell lønn - feriedager - reduksjoner* + arbeidsgiver-tillegg) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger + Nav-utbetalinger`
+                        : `faktisk årslønn = (nominell lønn - feriedager) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                       break;
                     case 'anal':
                       const realHourlyRate = nominalSalary / (actualWorkDays * displayHoursPerDay);
                       const allLeaveDeduction = (daysTakenByType.ferie + daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay * realHourlyRate;
-                      const analBase = nominalSalary - allLeaveDeduction;
+                      const analBase = nominalSalary - allLeaveDeduction - foreldreComp.salaryDeduction - sykeComp.salaryDeduction;
                       const analVacationBase = analBase + foreldreComp.employerPay + sykeComp.employerPay;
                       actualEarnings = analVacationBase + (analVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
-                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0
-                        ? `faktisk årslønn = (nominell lønn - alle fridager* + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`
-                        : `faktisk årslønn = (nominell lønn - feriedager + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`;
+                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0
+                        ? `faktisk årslønn = (nominell lønn - alle fridager* + arbeidsgiver-tillegg) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger + Nav-utbetalinger (basert på faktiske arbeidsdager)`
+                        : `faktisk årslønn = (nominell lønn - feriedager) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`;
                       break;
                     default:
-                      const defaultBase = (nominalSalary * 11/12) - unpaidLeaveDeduction;
+                      const defaultBase = (nominalSalary * 11/12) - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeComp.salaryDeduction;
                       const defaultVacationBase = defaultBase + foreldreComp.employerPay + sykeComp.employerPay;
                       actualEarnings = defaultVacationBase + (defaultVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
-                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0
-                        ? `faktisk årslønn = (11/12 av nominell lønn - fri uten lønn* + foreldrepermisjon) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
-                        : `faktisk årslønn = 11/12 av nominell lønn + foreldrepermisjon + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
+                      calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0
+                        ? `faktisk årslønn = (11/12 av nominell lønn - reduksjoner* + arbeidsgiver-tillegg) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger + Nav-utbetalinger`
+                        : `faktisk årslønn = 11/12 av nominell lønn + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                   }
                   
                   const actualHourlyRate = actualHoursWorked > 0 ? actualEarnings / actualHoursWorked : 0;
@@ -1379,10 +1393,18 @@ export default function Home() {
                           <p className="text-xs mt-3 opacity-70 border-t pt-2">
                             {calculationExplanation}
                           </p>
-                          {daysTakenByType.permisjon_uten_lonn > 0 && (
-                            <p className="text-xs mt-2 opacity-60">
-                              * fri uten lønn beregnes med nominell timelønn ({Math.round(nominalHourlyRate).toLocaleString('nb-NO')} kr/time)
-                            </p>
+                          {(daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0) && (
+                            <div className="text-xs mt-2 opacity-60 space-y-1">
+                              {daysTakenByType.permisjon_uten_lonn > 0 && (
+                                <p>* fri uten lønn beregnes med nominell timelønn ({Math.round(nominalHourlyRate).toLocaleString('nb-NO')} kr/time)</p>
+                              )}
+                              {(daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0) && (
+                                <p>* foreldrepermisjon: Nav betaler opptil 6G ({Math.round(get6GForYear(displayYear)).toLocaleString('nb-NO')} kr/år = {Math.round(get6GForYear(displayYear)/actualWorkDays).toLocaleString('nb-NO')} kr/dag), som er mindre enn din daglønn</p>
+                              )}
+                              {daysTakenByType.sykemelding > 0 && (
+                                <p>* sykemelding: Nav betaler opptil 6G ({Math.round(get6GForYear(displayYear)/actualWorkDays).toLocaleString('nb-NO')} kr/dag), {daysTakenByType.sykemelding <= 48 ? 'med feriepenger' : `med feriepenger første 48 dager (${Math.min(48, daysTakenByType.sykemelding)} av ${daysTakenByType.sykemelding})`}</p>
+                              )}
+                            </div>
                           )}
                         </div>
                       </details>
