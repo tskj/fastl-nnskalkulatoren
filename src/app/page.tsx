@@ -64,7 +64,7 @@ export default function Home() {
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState<boolean>(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useLocalStorage<string>('yearlyIncome', '600 000');
+  const [yearlyIncomeDisplay, setYearlyIncomeDisplay] = useLocalStorage<string>('yearlyIncome', '');
   const [vacationPay, setVacationPay] = useLocalStorage<number>('vacationPay', 12);
   const [vacationPayDisplay, setVacationPayDisplay] = useLocalStorage<string>('vacationPayDisplay', '12');
   const [hoursPerDay, setHoursPerDay] = useLocalStorage<number>('hoursPerDay', 7.5);
@@ -78,12 +78,12 @@ export default function Home() {
   // Use current year for server rendering to avoid hydration mismatch
   const displayYear = isHydrated ? year : new Date().getFullYear();
 
-  // Use default values for server rendering to avoid hydration mismatch
-  const displayVacationPay = isHydrated ? vacationPay : 12;
-  const displayVacationPayText = isHydrated ? vacationPayDisplay : '12';
-  const displayHoursPerDay = isHydrated ? hoursPerDay : 7.5;
-  const displayHoursPerDayText = isHydrated ? hoursPerDayDisplay : '7,5';
-  const displayYearlyIncomeText = isHydrated ? yearlyIncomeDisplay : '600 000';
+  // Server render as empty, client shows localStorage OR defaults with fade-in
+  const displayVacationPay = isHydrated ? vacationPay : null;
+  const displayVacationPayText = isHydrated ? vacationPayDisplay : '';
+  const displayHoursPerDay = isHydrated ? hoursPerDay : null;
+  const displayHoursPerDayText = isHydrated ? hoursPerDayDisplay : '';
+  const displayYearlyIncomeText = isHydrated ? yearlyIncomeDisplay : '';
 
 
   // Ref for dropdown click-outside detection
@@ -575,7 +575,8 @@ export default function Home() {
                 type="text"
                 value={displayYearlyIncomeText}
                 onChange={handleYearlyIncomeChange}
-                className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
+                className={`inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input transition-opacity duration-500 ${isHydrated ? 'opacity-100' : 'opacity-0'}`}
+                placeholder="000 000"
                 style={{
                   borderBottomColor: 'var(--input-border)',
                   color: 'var(--text-primary)',
@@ -609,7 +610,8 @@ export default function Home() {
                     }
                   }
                 }}
-                className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
+                className={`inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input transition-opacity duration-500 ${isHydrated ? 'opacity-100' : 'opacity-0'}`}
+                placeholder="7,5"
                 style={{
                   borderBottomColor: 'var(--input-border)',
                   color: 'var(--text-primary)',
@@ -620,8 +622,8 @@ export default function Home() {
                 step="0.1"
               />
               {' '}timer per dag
-              {displayHoursPerDay && (
-                <span className="opacity-50 animate-fadeInToHalf"> (for en {(displayHoursPerDay * 5).toString().replace('.', ',')} timer arbeidsuke)</span>
+              {isHydrated && displayHoursPerDay && (
+                <span className="opacity-50 animate-fadeInToHalf transition-opacity duration-500"> (for en {(displayHoursPerDay * 5).toString().replace('.', ',')} timer arbeidsuke)</span>
               )}
               .
             </p>
@@ -648,7 +650,8 @@ export default function Home() {
                     }
                   }
                 }}
-                className="inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input"
+                className={`inline-block bg-transparent border-0 border-b border-solid focus:outline-none text-center mx-1 salary-input transition-opacity duration-500 ${isHydrated ? 'opacity-100' : 'opacity-0'}`}
+                placeholder="12"
                 style={{
                   borderBottomColor: 'var(--input-border)',
                   color: 'var(--text-primary)',
@@ -682,7 +685,7 @@ export default function Home() {
             <span className="inline-block relative mx-1" ref={dropdownRef}>
               <button
                 onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
-                className="bg-transparent border-0 border-b border-solid focus:outline-none text-center cursor-pointer salary-input hover:opacity-70 transition-opacity"
+                className={`bg-transparent border-0 border-b border-solid focus:outline-none text-center cursor-pointer salary-input hover:opacity-70 transition-opacity duration-500 ${isHydrated ? 'opacity-100' : 'opacity-0'}`}
                 style={{
                   borderBottomColor: 'var(--input-border)',
                   color: 'var(--text-primary)',
@@ -818,18 +821,19 @@ export default function Home() {
           <div>
             <p className="text-lg leading-relaxed text-opacity-90" style={{ color: 'var(--text-primary)' }}>
               Det er vanlig å regne 260 arbeidsdager per år, som med din arbeidsuke gir{' '}
-              {displayHoursPerDay && (
-                <span className="font-medium text-opacity-100">
+              {isHydrated && displayHoursPerDay && (
+                <span className="font-medium text-opacity-100 transition-opacity duration-500">
                   {(displayHoursPerDay * 5 * 52).toLocaleString('nb-NO').replace(/\./g, ',')} timer per år
                 </span>
               )}
+              {!isHydrated && <span className="text-opacity-0">... timer per år</span>}
               .
             </p>
 
-            {displayYearlyIncomeText && displayHoursPerDay && (
-              <p className="text-lg leading-relaxed mt-4 text-opacity-90" style={{ color: 'var(--text-primary)' }}>
+            {isHydrated && displayYearlyIncomeText && displayHoursPerDay && (
+              <p className="text-lg leading-relaxed mt-4 text-opacity-90 transition-opacity duration-500" style={{ color: 'var(--text-primary)' }}>
                 Din nominelle timelønn er{' '}
-                <span className="font-medium text-opacity-100">
+                <span className="font-medium text-opacity-100 transition-opacity duration-500">
                   {Math.round(
                     (parseFloat(displayYearlyIncomeText.replace(/\s/g, '')) || 0) /
                     (displayHoursPerDay * 5 * 52)
@@ -899,7 +903,7 @@ export default function Home() {
 
             {/* Reserve space for salary calculations */}
             <div className="mt-6 min-h-[8rem]">
-              {displayYearlyIncomeText && displayHoursPerDay && displayVacationPay && (
+              {isHydrated && displayYearlyIncomeText && displayHoursPerDay && displayVacationPay && (
                 <>
                   {(() => {
                   const actualHoursWorked = (actualWorkDays - daysTakenByType.ferie - daysTakenByType.permisjon_med_lonn - daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay;
@@ -972,7 +976,7 @@ export default function Home() {
                       </p>
                       <p className="text-lg leading-relaxed mt-4 text-opacity-90" style={{ color: 'var(--text-primary)' }}>
                         Din faktiske årslønn blir{' '}
-                        <span className="font-medium text-opacity-100">
+                        <span className="font-medium text-opacity-100 transition-opacity duration-500">
                           {Math.round(actualEarnings).toLocaleString('nb-NO')} kroner
                         </span>
                         <span className="opacity-60"> (som gir en reell timelønn på {Math.round(actualHourlyRate).toLocaleString('nb-NO')} kr/time for timene du faktisk jobbet)</span>
@@ -1073,7 +1077,7 @@ export default function Home() {
             <span
               onClick={() => {
                 // Reset global form fields to defaults
-                setYearlyIncomeDisplay('600 000');
+                setYearlyIncomeDisplay('');
                 setVacationPay(12);
                 setVacationPayDisplay('12');
                 setHoursPerDay(7.5);
