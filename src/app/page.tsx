@@ -635,14 +635,18 @@ export default function Home() {
     setYearlyIncomeDisplay(formatted);
   };
 
-  // Auto-fill vacation days
+  // Auto-fill vacation days starting from July (fellesferie)
   const fillVacationWeeks = (weeks: number) => {
     const daysToMark = weeks * 5; // 5 work days per week
     let markedDays = 0;
     const newDayStates = new Map(dayStates);
     
-    // Iterate through months and mark weekdays as vacation
-    for (let monthNum = 1; monthNum <= 12 && markedDays < daysToMark; monthNum++) {
+    // Start with July (month 7), then continue through rest of year, then wrap to beginning
+    const monthOrder = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+    
+    for (const monthNum of monthOrder) {
+      if (markedDays >= daysToMark) break;
+      
       const daysInMonth = new Date(displayYear, monthNum, 0).getDate();
       
       for (let day = 1; day <= daysInMonth && markedDays < daysToMark; day++) {
@@ -1094,7 +1098,8 @@ export default function Home() {
                     // Regular foreldrepermisjon (100%)
                     if (daysTakenByType.foreldrepermisjon > 0) {
                       const dailyRate = nominalHourlyRate * displayHoursPerDay;
-                      const navDailyRate = Math.min(nominalSalary, sixGForYear) / actualWorkDays;
+                      const maxNavDailyRate = sixGForYear / actualWorkDays;
+                      const navDailyRate = Math.min(dailyRate, maxNavDailyRate);
                       const employerDailyRate = employerCoversAbove6G ? Math.max(0, dailyRate - navDailyRate) : 0;
                       
                       // Total Nav payment (no vacation pay)
@@ -1102,19 +1107,26 @@ export default function Home() {
                       // Total employer payment (gets vacation pay)
                       totalEmployerPay += daysTakenByType.foreldrepermisjon * employerDailyRate;
                       // Deduction from base salary (the days you don't get your full salary)
-                      totalSalaryDeduction += daysTakenByType.foreldrepermisjon * dailyRate;
+                      // Even if employer covers above 6G, you lose vacation pay on Nav's portion
+                      const vacationLossOnNavPortion = navDailyRate * (displayVacationPay / 100);
+                      const foreldreDeduction = employerCoversAbove6G ? vacationLossOnNavPortion : (dailyRate - navDailyRate + vacationLossOnNavPortion);
+                      totalSalaryDeduction += daysTakenByType.foreldrepermisjon * foreldreDeduction;
                     }
                     
                     // 80% foreldrepermisjon (spread over 125% time, but same total amount)
                     if (daysTakenByType.foreldrepermisjon_80 > 0) {
                       const dailyRate = nominalHourlyRate * displayHoursPerDay;
-                      const navDailyRate = Math.min(nominalSalary, sixGForYear) / actualWorkDays;
+                      const maxNavDailyRate = sixGForYear / actualWorkDays;
+                      const navDailyRate = Math.min(dailyRate, maxNavDailyRate);
                       const employerDailyRate = employerCoversAbove6G ? Math.max(0, dailyRate - navDailyRate) : 0;
                       
                       // 80% gets same Nav daily rate per day taken off
                       totalNavPay += daysTakenByType.foreldrepermisjon_80 * navDailyRate;
                       totalEmployerPay += daysTakenByType.foreldrepermisjon_80 * employerDailyRate;
-                      totalSalaryDeduction += daysTakenByType.foreldrepermisjon_80 * dailyRate;
+                      // Even if employer covers above 6G, you lose vacation pay on Nav's portion
+                      const vacation80LossOnNavPortion = navDailyRate * (displayVacationPay / 100);
+                      const foreldre80Deduction = employerCoversAbove6G ? vacation80LossOnNavPortion : (dailyRate - navDailyRate + vacation80LossOnNavPortion);
+                      totalSalaryDeduction += daysTakenByType.foreldrepermisjon_80 * foreldre80Deduction;
                     }
                     
                     return { 
@@ -1126,96 +1138,122 @@ export default function Home() {
                   
                   const foreldreComp = calculateForeldrepermisjonPay();
                   
-                  // Calculate sykemelding deduction/compensation (complex 48-day vacation pay limit)
-                  const calculateSykemeldingPay = () => {
+                  // Calculate sykemelding compensation - step by step logic
+                  const calculateSykemeldingPay = (calculationMethod: string) => {
                     if (daysTakenByType.sykemelding === 0) {
-                      return { navPay: 0, navVacationPay: 0, employerPay: 0, employerVacationPay: 0, salaryDeduction: 0 };
+                      return { totalCompensation: 0, salaryLoss: 0 };
                     }
                     
                     const sixGForYear = get6GForYear(displayYear);
                     const dailyRate = nominalHourlyRate * displayHoursPerDay;
-                    const navDailyRate = Math.min(nominalSalary, sixGForYear) / actualWorkDays;
+                    const maxNavDailyRate = sixGForYear / actualWorkDays;
+                    const navDailyRate = Math.min(dailyRate, maxNavDailyRate);
                     const employerDailyRate = employerCoversSykeAbove6G ? Math.max(0, dailyRate - navDailyRate) : 0;
                     
-                    // Nav pays all sick days up to 6G
-                    const navPay = daysTakenByType.sykemelding * navDailyRate;
-                    const employerPay = daysTakenByType.sykemelding * employerDailyRate;
+                    // What you would normally get per day depends on calculation method
+                    let normalDailyTotal: number;
+                    switch (calculationMethod) {
+                      case 'standard':
+                        // Standard: 11/12 of nominal salary + vacation pay
+                        normalDailyTotal = (dailyRate * 11/12) + ((dailyRate * 11/12) * displayVacationPay / 100);
+                        break;
+                      case 'generous':
+                        // Generous: Full salary + vacation pay
+                        normalDailyTotal = dailyRate + (dailyRate * displayVacationPay / 100);
+                        break;
+                      case 'stingy':
+                        // Stingy: No vacation pay on vacation days, but normal on work days
+                        normalDailyTotal = dailyRate + (dailyRate * displayVacationPay / 100);
+                        break;
+                      case 'anal':
+                        // Anal: Based on actual work days calculation
+                        const realHourlyRate = nominalSalary / (actualWorkDays * displayHoursPerDay);
+                        const realDailyRate = realHourlyRate * displayHoursPerDay;
+                        normalDailyTotal = realDailyRate + (realDailyRate * displayVacationPay / 100);
+                        break;
+                      default:
+                        normalDailyTotal = (dailyRate * 11/12) + ((dailyRate * 11/12) * displayVacationPay / 100);
+                    }
                     
-                    // Deduction from base salary (the days you don't get your full salary)
-                    const salaryDeduction = daysTakenByType.sykemelding * dailyRate;
-                    
-                    // Vacation pay logic: Nav only pays vacation on first 48 days
+                    // What you actually get per sick day
                     const first48Days = Math.min(daysTakenByType.sykemelding, 48);
                     const beyond48Days = Math.max(0, daysTakenByType.sykemelding - 48);
                     
-                    // Nav vacation pay: only on first 48 days
-                    const navVacationPay = (first48Days * navDailyRate) * (displayVacationPay / 100);
+                    // Nav compensation (pay + vacation pay for first 48 days only)
+                    const navDailyCompensation = navDailyRate + (navDailyRate * displayVacationPay / 100);
+                    const navCompensationFirst48 = first48Days * navDailyCompensation;
+                    const navCompensationBeyond48 = beyond48Days * navDailyRate; // No vacation pay after 48
                     
-                    // Employer vacation pay calculation
-                    let employerVacationPay = 0;
-                    if (employerCoversSykeAbove6G) {
-                      // Employer always pays vacation on their portion (above 6G)
-                      employerVacationPay += (daysTakenByType.sykemelding * employerDailyRate) * (displayVacationPay / 100);
-                    }
+                    // Employer compensation (pay + vacation pay if they cover above 6G)
+                    const employerDailyCompensation = employerDailyRate + (employerDailyRate * displayVacationPay / 100);
+                    const employerCompensation = daysTakenByType.sykemelding * employerDailyCompensation;
                     
-                    if (employerPaysVacationOnNavSick && beyond48Days > 0) {
-                      // If employer covers Nav portion vacation pay after 48 days
-                      employerVacationPay += (beyond48Days * navDailyRate) * (displayVacationPay / 100);
-                    }
+                    // Special case: employer covers Nav vacation pay after 48 days
+                    const extraEmployerVacation = (employerPaysVacationOnNavSick && beyond48Days > 0) ? 
+                      beyond48Days * navDailyRate * (displayVacationPay / 100) : 0;
+                    
+                    // Total compensation
+                    const totalCompensation = navCompensationFirst48 + navCompensationBeyond48 + employerCompensation + extraEmployerVacation;
+                    
+                    // What you normally would have earned
+                    const normalTotal = daysTakenByType.sykemelding * normalDailyTotal;
+                    
+                    // Net loss (positive means you lose money)
+                    const salaryLoss = normalTotal - totalCompensation;
                     
                     return { 
-                      navPay, 
-                      navVacationPay, 
-                      employerPay, 
-                      employerVacationPay,
-                      salaryDeduction
+                      totalCompensation,
+                      salaryLoss
                     };
                   };
                   
-                  const sykeComp = calculateSykemeldingPay();
-                  
                   switch (calculationMethod) {
                     case 'standard':
-                      const standardBase = (nominalSalary * 11/12) - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeComp.salaryDeduction;
-                      const standardVacationBase = standardBase + foreldreComp.employerPay + sykeComp.employerPay;
-                      actualEarnings = standardVacationBase + (standardVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
+                      const sykeCompStandard = calculateSykemeldingPay('standard');
+                      const standardBase = (nominalSalary * 11/12) - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeCompStandard.salaryLoss;
+                      const standardVacationBase = standardBase + foreldreComp.employerPay;
+                      actualEarnings = standardVacationBase + (standardVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeCompStandard.totalCompensation;
                       calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0
-                        ? `faktisk årslønn = (11/12 av nominell lønn - reduksjoner* + arbeidsgiver-tillegg) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger + Nav-utbetalinger`
+                        ? `faktisk årslønn = (11/12 av nominell lønn - reduksjoner* + kompensasjoner) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
                         : `faktisk årslønn = 11/12 av nominell lønn + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                       break;
                     case 'generous':
-                      const generousBase = nominalSalary - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeComp.salaryDeduction;
-                      const generousVacationBase = generousBase + foreldreComp.employerPay + sykeComp.employerPay;
-                      actualEarnings = generousVacationBase + (generousVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
+                      const sykeCompGenerous = calculateSykemeldingPay('generous');
+                      const generousBase = nominalSalary - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeCompGenerous.salaryLoss;
+                      const generousVacationBase = generousBase + foreldreComp.employerPay;
+                      actualEarnings = generousVacationBase + (generousVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeCompGenerous.totalCompensation;
                       calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0
-                        ? `faktisk årslønn = (full nominell lønn - reduksjoner* + arbeidsgiver-tillegg) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger + Nav-utbetalinger`
+                        ? `faktisk årslønn = (full nominell lønn - reduksjoner* + kompensasjoner) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
                         : `faktisk årslønn = full nominell lønn + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                       break;
                     case 'stingy':
+                      const sykeCompStingy = calculateSykemeldingPay('stingy');
                       const vacationDeduction = daysTakenByType.ferie * displayHoursPerDay * nominalHourlyRate;
-                      const stingyBase = nominalSalary - vacationDeduction - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeComp.salaryDeduction;
-                      const stingyVacationBase = stingyBase + foreldreComp.employerPay + sykeComp.employerPay;
-                      actualEarnings = stingyVacationBase + (stingyVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
+                      const stingyBase = nominalSalary - vacationDeduction - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeCompStingy.salaryLoss;
+                      const stingyVacationBase = stingyBase + foreldreComp.employerPay;
+                      actualEarnings = stingyVacationBase + (stingyVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeCompStingy.totalCompensation;
                       calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0
-                        ? `faktisk årslønn = (nominell lønn - feriedager - reduksjoner* + arbeidsgiver-tillegg) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger + Nav-utbetalinger`
+                        ? `faktisk årslønn = (nominell lønn - feriedager - reduksjoner* + kompensasjoner) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
                         : `faktisk årslønn = (nominell lønn - feriedager) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                       break;
                     case 'anal':
+                      const sykeCompAnal = calculateSykemeldingPay('anal');
                       const realHourlyRate = nominalSalary / (actualWorkDays * displayHoursPerDay);
                       const allLeaveDeduction = (daysTakenByType.ferie + daysTakenByType.permisjon_uten_lonn) * displayHoursPerDay * realHourlyRate;
-                      const analBase = nominalSalary - allLeaveDeduction - foreldreComp.salaryDeduction - sykeComp.salaryDeduction;
-                      const analVacationBase = analBase + foreldreComp.employerPay + sykeComp.employerPay;
-                      actualEarnings = analVacationBase + (analVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
+                      const analBase = nominalSalary - allLeaveDeduction - foreldreComp.salaryDeduction - sykeCompAnal.salaryLoss;
+                      const analVacationBase = analBase + foreldreComp.employerPay;
+                      actualEarnings = analVacationBase + (analVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeCompAnal.totalCompensation;
                       calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0
-                        ? `faktisk årslønn = (nominell lønn - alle fridager* + arbeidsgiver-tillegg) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger + Nav-utbetalinger (basert på faktiske arbeidsdager)`
+                        ? `faktisk årslønn = (nominell lønn - alle fridager* + kompensasjoner) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`
                         : `faktisk årslønn = (nominell lønn - feriedager) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger (basert på faktiske arbeidsdager)`;
                       break;
                     default:
-                      const defaultBase = (nominalSalary * 11/12) - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeComp.salaryDeduction;
-                      const defaultVacationBase = defaultBase + foreldreComp.employerPay + sykeComp.employerPay;
-                      actualEarnings = defaultVacationBase + (defaultVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeComp.navPay + sykeComp.navVacationPay + sykeComp.employerVacationPay;
+                      const sykeCompDefault = calculateSykemeldingPay('standard');
+                      const defaultBase = (nominalSalary * 11/12) - unpaidLeaveDeduction - foreldreComp.salaryDeduction - sykeCompDefault.salaryLoss;
+                      const defaultVacationBase = defaultBase + foreldreComp.employerPay;
+                      actualEarnings = defaultVacationBase + (defaultVacationBase * (displayVacationPay/100)) + foreldreComp.navPay + sykeCompDefault.totalCompensation;
                       calculationExplanation = daysTakenByType.permisjon_uten_lonn > 0 || daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0 || daysTakenByType.sykemelding > 0
-                        ? `faktisk årslønn = (11/12 av nominell lønn - reduksjoner* + arbeidsgiver-tillegg) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger + Nav-utbetalinger`
+                        ? `faktisk årslønn = (11/12 av nominell lønn - reduksjoner* + kompensasjoner) + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`
                         : `faktisk årslønn = 11/12 av nominell lønn + ${displayVacationPay.toString().replace('.', ',')}% feriepenger`;
                   }
                   
@@ -1316,44 +1354,64 @@ export default function Home() {
                           </div>
                           
                           {/* Employer coverage for foreldrepermisjon */}
-                          {(daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0) && (
-                            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                              <label className="flex items-start space-x-3 cursor-pointer">
-                                <div className="custom-checkbox">
-                                  <input
-                                    type="checkbox"
-                                    checked={employerCoversAbove6G}
-                                    onChange={(e) => setEmployerCoversAbove6G(e.target.checked)}
-                                    className="sr-only"
-                                  />
-                                  <div className={`w-4 h-4 border-2 rounded transition-colors ${employerCoversAbove6G ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'}`}>
-                                    {employerCoversAbove6G && (
-                                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                      </svg>
-                                    )}
-                                  </div>
+                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <label className={`flex items-start space-x-3 cursor-pointer transition-opacity ${(daysTakenByType.foreldrepermisjon > 0 || daysTakenByType.foreldrepermisjon_80 > 0) ? 'opacity-100' : 'opacity-40'}`}>
+                              <div className="custom-checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={employerCoversAbove6G}
+                                  onChange={(e) => setEmployerCoversAbove6G(e.target.checked)}
+                                  className="sr-only"
+                                />
+                                <div className={`w-4 h-4 border-2 rounded transition-colors ${employerCoversAbove6G ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'}`}>
+                                  {employerCoversAbove6G && (
+                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
                                 </div>
-                                <span className="text-sm">
-                                  Arbeidsgiveren min dekker lønn over 6G under foreldrepermisjon (bare arbeidsgiverens del gir feriepenger)
-                                </span>
-                              </label>
-                            </div>
-                          )}
+                              </div>
+                              <span className="text-sm">
+                                Arbeidsgiveren min dekker lønn over 6G under foreldrepermisjon {(daysTakenByType.foreldrepermisjon === 0 && daysTakenByType.foreldrepermisjon_80 === 0) && '(ingen foreldrepermisjon valgt)'}
+                              </span>
+                            </label>
+                          </div>
                           
                           {/* Sykemelding employer coverage options */}
-                          {daysTakenByType.sykemelding > 0 && (
-                            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                              <label className="flex items-start space-x-3 cursor-pointer mb-3">
+                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <label className={`flex items-start space-x-3 cursor-pointer mb-3 transition-opacity ${daysTakenByType.sykemelding > 0 ? 'opacity-100' : 'opacity-40'}`}>
+                              <div className="custom-checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={employerCoversSykeAbove6G}
+                                  onChange={(e) => setEmployerCoversSykeAbove6G(e.target.checked)}
+                                  className="sr-only"
+                                />
+                                <div className={`w-4 h-4 border-2 rounded transition-colors ${employerCoversSykeAbove6G ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'}`}>
+                                  {employerCoversSykeAbove6G && (
+                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
+                                </div>
+                              </div>
+                              <span className="text-sm">
+                                Arbeidsgiveren min dekker lønn over 6G under sykemelding {daysTakenByType.sykemelding === 0 && '(ingen sykemelding valgt)'}
+                              </span>
+                            </label>
+                            
+                            {/* Show after 48 days option only when relevant */}
+                            {daysTakenByType.sykemelding > 48 && (
+                              <label className="flex items-start space-x-3 cursor-pointer mt-3">
                                 <div className="custom-checkbox">
                                   <input
                                     type="checkbox"
-                                    checked={employerCoversSykeAbove6G}
-                                    onChange={(e) => setEmployerCoversSykeAbove6G(e.target.checked)}
+                                    checked={employerPaysVacationOnNavSick}
+                                    onChange={(e) => setEmployerPaysVacationOnNavSick(e.target.checked)}
                                     className="sr-only"
                                   />
-                                  <div className={`w-4 h-4 border-2 rounded transition-colors ${employerCoversSykeAbove6G ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'}`}>
-                                    {employerCoversSykeAbove6G && (
+                                  <div className={`w-4 h-4 border-2 rounded transition-colors ${employerPaysVacationOnNavSick ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'}`}>
+                                    {employerPaysVacationOnNavSick && (
                                       <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                       </svg>
@@ -1361,34 +1419,12 @@ export default function Home() {
                                   </div>
                                 </div>
                                 <span className="text-sm">
-                                  Arbeidsgiveren min dekker lønn over 6G under sykemelding (arbeidsgiverens del gir feriepenger, Nav gir feriepenger de første 48 dagene)
+                                  Arbeidsgiveren min betaler feriepenger på Navs del etter 48 dager sykemelding ({daysTakenByType.sykemelding - 48} dager over grensen)
                                 </span>
                               </label>
-                              
-                              {daysTakenByType.sykemelding > 48 && (
-                                <label className="flex items-start space-x-3 cursor-pointer">
-                                  <div className="custom-checkbox">
-                                    <input
-                                      type="checkbox"
-                                      checked={employerPaysVacationOnNavSick}
-                                      onChange={(e) => setEmployerPaysVacationOnNavSick(e.target.checked)}
-                                      className="sr-only"
-                                    />
-                                    <div className={`w-4 h-4 border-2 rounded transition-colors ${employerPaysVacationOnNavSick ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'}`}>
-                                      {employerPaysVacationOnNavSick && (
-                                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <span className="text-sm">
-                                    Arbeidsgiveren min betaler feriepenger på Navs del etter 48 dager sykemelding totalt per år (utover vanlig Nav-regel)
-                                  </span>
-                                </label>
-                              )}
-                            </div>
-                          )}
+                            )}
+                            
+                          </div>
                           
                           <p className="text-xs mt-3 opacity-70 border-t pt-2">
                             {calculationExplanation}
