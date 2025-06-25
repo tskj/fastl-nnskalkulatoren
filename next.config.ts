@@ -5,8 +5,8 @@ const isProd = process.env.NODE_ENV === 'production';
 const nextConfig: NextConfig = {
   output: 'export',
   trailingSlash: true,
-  basePath: isProd ? '/fastl-nnskalkulatoren' : '',
-  assetPrefix: isProd ? '/fastl-nnskalkulatoren' : '',
+  basePath: isProd ? '/feriepengekalkulator' : '',
+  assetPrefix: isProd ? '/feriepengekalkulator' : '',
   images: {
     unoptimized: true
   }
